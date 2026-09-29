@@ -135,6 +135,46 @@ def test_import_auto_suppresses_invalid_addresses(db: Session, validator, clock)
     assert suppressions_service.is_suppressed(db, "good@northwind.example") is None
 
 
+def test_revalidate_clears_an_automatic_suppression_when_the_mailbox_exists(
+    db: Session, validator, clock
+) -> None:
+    validator.by_email = {
+        "info@clinic.example": ValidationResult.invalid("ZeroBounce: do_not_mail / role_based.")
+    }
+    contacts_service.import_csv(
+        db, b"Email\ninfo@clinic.example\n", validator=validator, clock=clock
+    )
+    contact = contacts_service.by_email(db, "info@clinic.example")
+    assert contact is not None and contact.suppressed is True
+
+    validator.by_email["info@clinic.example"] = ValidationResult.valid(
+        "ZeroBounce: do_not_mail / role_based."
+    )
+    updated = contacts_service.revalidate(db, contact.id, validator=validator, clock=clock)
+
+    assert updated.validation_status == "valid"
+    assert updated.suppressed is False
+    assert suppressions_service.is_suppressed(db, "info@clinic.example") is None
+
+
+def test_revalidate_leaves_an_opt_out_in_place(db: Session, validator, clock) -> None:
+    suppressions_service.suppress(
+        db, "info@clinic.example", reason=REASON_UNSUB, source="reply", now=clock.now()
+    )
+    db.flush()
+    contacts_service.import_csv(
+        db, b"Email\ninfo@clinic.example\n", validator=validator, clock=clock
+    )
+    contact = contacts_service.by_email(db, "info@clinic.example")
+    assert contact is not None
+
+    updated = contacts_service.revalidate(db, contact.id, validator=validator, clock=clock)
+
+    assert updated.validation_status == "valid"
+    assert updated.suppressed is True
+    assert updated.suppressed_reason == REASON_UNSUB
+
+
 def test_import_marks_risky_without_suppressing(db: Session, validator, clock) -> None:
     validator.default = ValidationResult.risky("catch-all domain")
     summary = contacts_service.import_csv(

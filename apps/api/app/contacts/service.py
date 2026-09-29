@@ -223,7 +223,15 @@ def revalidate(
     db: Session, contact_id: uuid.UUID, *, validator: EmailValidator, clock: Clock
 ) -> Contact:
     contact = require(db, contact_id)
-    apply_validation(db, contact, validator.validate(contact.email), now=clock.now())
+    outcome = validator.validate(contact.email)
+    apply_validation(db, contact, outcome, now=clock.now())
+    # A shared inbox used to be stored as invalid and auto-suppressed. Once a
+    # later check says the mailbox exists, that automatic suppression is a
+    # mistake. An opt-out, bounce, or complaint is left in place.
+    if outcome.status == VALIDATION_VALID:
+        existing = suppressions_service.is_suppressed(db, contact.email)
+        if existing is not None and existing.source.startswith("auto: validation"):
+            suppressions_service.unsuppress(db, contact.email)
     db.commit()
     db.refresh(contact)
     return contact

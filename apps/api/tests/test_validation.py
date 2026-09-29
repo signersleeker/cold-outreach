@@ -179,6 +179,42 @@ def test_zerobounce_disposable_sub_status_overrides_a_valid_status() -> None:
     assert result.status == "invalid"
 
 
+def test_role_inbox_exists_so_it_is_valid() -> None:
+    """info@ / admin@ / reception@ come back do_not_mail / role_based.
+
+    ZeroBounce documents those as real mailboxes. The do_not_mail label is a
+    bulk-sender warning, not "this address does not exist".
+    """
+    result = zb({"status": "do_not_mail", "sub_status": "role_based"}).validate(
+        "reception@clinic.example"
+    )
+    assert result.status == "valid"
+    assert "role_based" in result.detail
+
+
+def test_mailbox_not_found_is_invalid() -> None:
+    result = zb({"status": "invalid", "sub_status": "mailbox_not_found"}).validate(
+        "nobody@clinic.example"
+    )
+    assert result.status == "invalid"
+
+
+@pytest.mark.parametrize(
+    "sub_status",
+    ["no_dns_entries", "does_not_accept_mail"],
+)
+def test_undeliverable_domain_is_invalid(sub_status: str) -> None:
+    result = zb({"status": "invalid", "sub_status": sub_status}).validate("a@missing.example")
+    assert result.status == "invalid"
+
+
+def test_role_inbox_on_a_catch_all_domain_is_not_confirmed() -> None:
+    result = zb({"status": "do_not_mail", "sub_status": "role_based_catch_all"}).validate(
+        "info@catchall.example"
+    )
+    assert result.status == "risky"
+
+
 def test_zerobounce_error_field_yields_unknown() -> None:
     result = zb({"error": "Invalid API key"}).validate("avery@northwind.example")
     assert result.status == "unknown"

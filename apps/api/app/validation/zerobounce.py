@@ -14,10 +14,9 @@ ZEROBOUNCE_VALIDATE_URL = "https://api.zerobounce.net/v2/validate"
 
 _TIMEOUT_SECONDS = 15.0
 
-# ZeroBounce "status" -> our vocabulary.
-#   catch-all  : the domain accepts everything, so the mailbox may not exist.
-#   do_not_mail: role accounts, complainers, toxic addresses. Treated as invalid
-#                because sending to them is what generates complaints.
+# ZeroBounce "status" -> our vocabulary, before sub_status is considered.
+# catch-all accepts every address, so the specific mailbox is unconfirmed.
+# do_not_mail is a mix: role inboxes exist, and the rest should not be mailed.
 _STATUS_MAP = {
     "valid": "valid",
     "invalid": "invalid",
@@ -27,6 +26,49 @@ _STATUS_MAP = {
     "do_not_mail": "invalid",
     "unknown": "unknown",
 }
+
+# ZeroBounce files these under do_not_mail, and documents them as real mailboxes
+# (info@, admin@, reception@). https://www.zerobounce.net/docs/email-validation-api-quickstart/v2-status-codes
+_MAILBOX_EXISTS = frozenset({"role_based"})
+
+# The address cannot receive mail.
+_MAILBOX_ABSENT = frozenset(
+    {
+        "mailbox_not_found",
+        "no_dns_entries",
+        "does_not_accept_mail",
+        "failed_syntax_check",
+        "possible_typo",
+        "unroutable_ip_address",
+    }
+)
+
+# A role-shaped address on a domain that accepts every recipient. The specific
+# mailbox was not confirmed, so this is not "valid" and not "invalid".
+_MAILBOX_UNCONFIRMED = frozenset({"role_based_catch_all", "role_based_accept_all"})
+
+# Real or not, these must not be mailed.
+_DO_NOT_SEND = frozenset(
+    {"disposable", "toxic", "global_suppression", "possible_trap", "spamtrap", "abuse"}
+)
+
+
+def verdict(raw_status: str, sub_status: str) -> str:
+    """Map a ZeroBounce result to valid, invalid, risky, or unknown.
+
+    valid: the mailbox exists. invalid: it does not, or it must not be mailed.
+    risky: this specific mailbox could not be confirmed. unknown: the check
+    did not finish.
+    """
+    if sub_status in _DO_NOT_SEND or raw_status in _DO_NOT_SEND:
+        return "invalid"
+    if sub_status in _MAILBOX_EXISTS:
+        return "valid"
+    if sub_status in _MAILBOX_UNCONFIRMED or raw_status == "catch-all":
+        return "risky"
+    if raw_status == "invalid" or sub_status in _MAILBOX_ABSENT:
+        return "invalid"
+    return _STATUS_MAP.get(raw_status, "unknown")
 
 
 class ZeroBounceValidator:
@@ -64,12 +106,7 @@ class ZeroBounceValidator:
         raw_status = str(payload.get("status") or "unknown").lower()
         sub_status = str(payload.get("sub_status") or "").lower()
 
-        # A disposable address can come back as "valid" with the detail only in
-        # sub_status, so this is checked ahead of the status map.
-        if sub_status in ("disposable", "toxic", "global_suppression"):
-            return ValidationResult.invalid(f"ZeroBounce: {raw_status} / {sub_status}.")
-
-        status = _STATUS_MAP.get(raw_status, "unknown")
+        status = verdict(raw_status, sub_status)
         detail = f"ZeroBounce: {raw_status}"
         if sub_status:
             detail += f" / {sub_status}"
