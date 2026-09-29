@@ -137,10 +137,14 @@ Nothing can be sent until a mailbox is connected. The address you authorise beco
 
 ## Import a CSV
 
-**Contacts → Import CSV.** Only an email column is required. These header spellings are recognised
-automatically (case and punctuation are ignored):
+**Contacts → Import CSV.** Pick a file, then confirm how each header maps to a field. Only an
+**email** column is required. Company and every other field are optional — a blank or unmapped
+company imports the contact with no company.
 
-| Field        | Accepted headers                                                      |
+Common header spellings are suggested automatically (case and punctuation are ignored); you can
+override any suggestion before importing:
+
+| Field        | Suggested headers                                                     |
 | ------------ | --------------------------------------------------------------------- |
 | `email`      | email, Email, Work Email, E-Mail, Business Email, Primary Email        |
 | `first_name` | first_name, First Name, First, Given Name, fname                       |
@@ -151,6 +155,9 @@ automatically (case and punctuation are ignored):
 | `notes`      | notes, note, comments                                                  |
 | `source`     | source, Source URL, Lead Source, url                                   |
 | *(name)*     | name, Full Name, Contact Name — split into first/last if no first/last |
+
+Matching company names (case-insensitive) share one company row. Open **Companies** in the nav to
+browse them and send to a company's contacts.
 
 Try it with the sample file, which deliberately exercises every outcome:
 

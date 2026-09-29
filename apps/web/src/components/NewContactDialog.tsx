@@ -2,7 +2,7 @@ import { UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateContact } from '@/hooks';
-import type { NewContact } from '@/lib/api';
+import type { Contact, NewContact } from '@/lib/api';
 import { ErrorBanner } from './AppLayout';
 import { Button } from './ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from './ui/dialog';
@@ -19,7 +19,18 @@ const BLANK: NewContact = {
   source: '',
 };
 
-export function NewContactDialog() {
+export function NewContactDialog({
+  companyName = '',
+  companyLocked = false,
+  onCreated,
+}: {
+  /** Prefill the company field (e.g. when adding from a company page). */
+  companyName?: string;
+  /** When true the company field is shown read-only. */
+  companyLocked?: boolean;
+  /** Called instead of navigating to the contact detail page. */
+  onCreated?: (contact: Contact) => void;
+} = {}) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<NewContact>(BLANK);
   const create = useCreateContact();
@@ -31,17 +42,20 @@ export function NewContactDialog() {
   function reset(next: boolean) {
     setOpen(next);
     if (next) {
-      setDraft(BLANK);
+      setDraft({ ...BLANK, company: companyName });
       create.reset();
     }
   }
 
   function submit() {
     create.mutate(draft, {
-      // Straight to the contact so the validation verdict is visible immediately.
       onSuccess: (contact) => {
         setOpen(false);
-        navigate(`/contacts/${contact.id}`);
+        if (onCreated) {
+          onCreated(contact);
+        } else {
+          navigate(`/contacts/${contact.id}`);
+        }
       },
     });
   }
@@ -68,7 +82,11 @@ export function NewContactDialog() {
 
       <DialogContent
         title="New contact"
-        description="Only the email address is required. It is validated as soon as you save."
+        description={
+          companyLocked && companyName
+            ? `Added under ${companyName}. Only the email address is required.`
+            : 'Only the email address is required. It is validated as soon as you save.'
+        }
       >
         <DialogBody className="space-y-3">
           <form
@@ -106,6 +124,8 @@ export function NewContactDialog() {
               <Field label="Company">
                 <Input
                   value={draft.company}
+                  readOnly={companyLocked}
+                  disabled={companyLocked}
                   onChange={(event) => set('company')(event.target.value)}
                 />
               </Field>

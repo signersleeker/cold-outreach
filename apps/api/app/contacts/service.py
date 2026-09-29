@@ -8,8 +8,10 @@ from dataclasses import dataclass, field
 from time import monotonic
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
+from app.companies import service as companies_service
+from app.companies.company import Company
 from app.constants import (
     IMPORT_VALIDATION_BUDGET_SECONDS,
     IMPORT_VALIDATION_WORKERS,
@@ -54,10 +56,20 @@ def _assign_unsub_token(db: Session, contact: Contact) -> None:
     raise AppError(500, "could not allocate an unsubscribe token")
 
 
+def _assign_company(db: Session, contact: Contact, name: str | None) -> None:
+    """Point the contact at a company by name, or clear the FK when blank."""
+    if name is None:
+        return
+    company = companies_service.find_or_create(db, name)
+    contact.company_id = company.id if company is not None else None
+    contact.company_ref = company
+
+
 @dataclass
 class ImportSummary:
     created: int = 0
     skipped_dupes: int = 0
+    skipped_existing_company: int = 0
     invalid: int = 0
     risky: int = 0
     valid: int = 0
@@ -71,7 +83,11 @@ class ImportSummary:
 
 # ------------------------------------------------------------------ queries ----
 def get(db: Session, contact_id: uuid.UUID) -> Contact | None:
-    return db.get(Contact, contact_id)
+    return db.scalar(
+        select(Contact)
+        .options(joinedload(Contact.company_ref))
+        .where(Contact.id == contact_id)
+    )
 
 
 def require(db: Session, contact_id: uuid.UUID) -> Contact:
@@ -82,13 +98,21 @@ def require(db: Session, contact_id: uuid.UUID) -> Contact:
 
 
 def by_email(db: Session, email: str) -> Contact | None:
-    return db.scalar(select(Contact).where(Contact.email == email.lower()))
+    return db.scalar(
+        select(Contact)
+        .options(joinedload(Contact.company_ref))
+        .where(Contact.email == email.lower())
+    )
 
 
 def by_unsub_token(db: Session, token: str) -> Contact | None:
     if not token:
         return None
-    return db.scalar(select(Contact).where(Contact.unsub_token == token))
+    return db.scalar(
+        select(Contact)
+        .options(joinedload(Contact.company_ref))
+        .where(Contact.unsub_token == token)
+    )
 
 
 def _apply_filter(query, status: str):  # noqa: ANN001 - SQLAlchemy Select generics
@@ -116,11 +140,16 @@ def search(
     *,
     q: str = "",
     status: str = "all",
+    company_id: uuid.UUID | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Contact], int]:
-    query = select(Contact)
+    query = select(Contact).options(joinedload(Contact.company_ref))
     count_query = select(func.count()).select_from(Contact)
+
+    if company_id is not None:
+        query = query.where(Contact.company_id == company_id)
+        count_query = count_query.where(Contact.company_id == company_id)
 
     if q.strip():
         pattern = f"%{q.strip().lower()}%"
@@ -128,8 +157,10 @@ def search(
             func.lower(Contact.email).like(pattern),
             func.lower(Contact.first_name).like(pattern),
             func.lower(Contact.last_name).like(pattern),
-            func.lower(Contact.company).like(pattern),
             func.lower(Contact.title).like(pattern),
+            Contact.company_id.in_(
+                select(Company.id).where(func.lower(Company.name).like(pattern))
+            ),
         )
         query = query.where(condition)
         count_query = count_query.where(condition)
@@ -139,7 +170,7 @@ def search(
 
     total = db.scalar(count_query) or 0
     rows = list(
-        db.scalars(query.order_by(Contact.created_at.desc()).limit(limit).offset(offset))
+        db.scalars(query.order_by(Contact.created_at.desc()).limit(limit).offset(offset)).unique()
     )
     return rows, total
 
@@ -147,14 +178,16 @@ def search(
 # ------------------------------------------------------------------ mutation ----
 def update(db: Session, contact_id: uuid.UUID, changes: dict[str, str]) -> Contact:
     contact = require(db, contact_id)
-    editable = ("first_name", "last_name", "company", "title", "hook", "notes", "source")
+    editable = ("first_name", "last_name", "title", "hook", "notes", "source")
     for name in editable:
         if name in changes and changes[name] is not None:
             setattr(contact, name, changes[name])
+    if "company" in changes and changes["company"] is not None:
+        _assign_company(db, contact, changes["company"])
     db.add(contact)
     db.commit()
     db.refresh(contact)
-    return contact
+    return require(db, contact.id)
 
 
 def send_event_count(db: Session, contact_id: uuid.UUID) -> int:
@@ -234,7 +267,7 @@ def revalidate(
             suppressions_service.unsuppress(db, contact.email)
     db.commit()
     db.refresh(contact)
-    return contact
+    return require(db, contact.id)
 
 
 def create(
@@ -253,14 +286,15 @@ def create(
     if by_email(db, normalized) is not None:
         raise AppError(409, f"{normalized} is already in the list")
 
+    company_name = fields.pop("company", "")
     contact = Contact(email=normalized, **{k: v or "" for k, v in fields.items()})
+    _assign_company(db, contact, company_name)
     _assign_unsub_token(db, contact)
     db.add(contact)
     db.flush()
     apply_validation(db, contact, validator.validate(normalized), now=clock.now())
     db.commit()
-    db.refresh(contact)
-    return contact
+    return require(db, contact.id)
 
 
 def import_csv(
@@ -269,6 +303,7 @@ def import_csv(
     *,
     validator: EmailValidator,
     clock: Clock,
+    column_map: dict[str, str] | None = None,
 ) -> ImportSummary:
     """Import a CSV, validating every new address inline.
 
@@ -276,8 +311,11 @@ def import_csv(
     wall-clock budget. Rows the budget does not reach stay `pending` and can be
     validated later from the contact page — far better than a request that times
     out after importing nothing.
+
+    When ``column_map`` is provided it maps header text -> field name and is
+    used instead of automatic alias matching.
     """
-    parsed = parse_csv(content, max_rows=MAX_CSV_ROWS)
+    parsed = parse_csv(content, max_rows=MAX_CSV_ROWS, column_map=column_map)
     summary = ImportSummary(
         missing_email=parsed.missing_email,
         truncated=parsed.truncated,
@@ -291,12 +329,28 @@ def import_csv(
             select(Contact.email).where(Contact.email.in_([r.email for r in parsed.rows]))
         )
     }
+    # Company names already in the DB — rows naming these are skipped so a re-import
+    # does not keep adding contacts under companies you already have.
+    company_names = {r.company.strip().lower() for r in parsed.rows if r.company.strip()}
+    existing_companies = {
+        name.lower()
+        for name in db.scalars(
+            select(Company.name).where(
+                func.lower(Company.name).in_(list(company_names))
+            )
+        )
+    } if company_names else set()
+
     fresh: list[ParsedRow] = []
     for row in parsed.rows:
         if row.email in existing:
             summary.skipped_dupes += 1
-        else:
-            fresh.append(row)
+            continue
+        company_key = row.company.strip().lower()
+        if company_key and company_key in existing_companies:
+            summary.skipped_existing_company += 1
+            continue
+        fresh.append(row)
 
     # Captured before insert: an address already on the suppression list keeps
     # that state even on a fresh import, and must not be confused with one this
@@ -315,12 +369,12 @@ def import_csv(
             email=row.email,
             first_name=row.first_name,
             last_name=row.last_name,
-            company=row.company,
             title=row.title,
             hook=row.hook,
             notes=row.notes,
             source=row.source,
         )
+        _assign_company(db, contact, row.company)
         _assign_unsub_token(db, contact)
         db.add(contact)
         created.append(contact)

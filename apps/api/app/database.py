@@ -52,6 +52,7 @@ def import_all_models() -> None:
     list to update when a slice gains a table.
     """
     from app.app_settings import app_setting  # noqa: F401
+    from app.companies import company  # noqa: F401
     from app.contacts import contact  # noqa: F401
     from app.gmail import oauth_token  # noqa: F401
     from app.sends.models import daily_counter, send_event  # noqa: F401

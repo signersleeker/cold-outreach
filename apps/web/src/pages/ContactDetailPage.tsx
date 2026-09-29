@@ -14,12 +14,11 @@ import type { Contact } from '@/lib/api';
 import { formatDateTime, fullName } from '@/lib/format';
 import { SEND_STATUS_TONE, SUPPRESSION_REASON_LABELS } from '@/lib/gates';
 
-type EditableField = 'firstName' | 'lastName' | 'company' | 'title' | 'hook' | 'source' | 'notes';
+type EditableField = 'firstName' | 'lastName' | 'title' | 'hook' | 'source' | 'notes';
 
 const TEXT_FIELDS: { key: EditableField; label: string; hint?: string }[] = [
   { key: 'firstName', label: 'First name' },
   { key: 'lastName', label: 'Last name' },
-  { key: 'company', label: 'Company' },
   { key: 'title', label: 'Title' },
 ];
 
@@ -124,6 +123,20 @@ export function ContactDetailPage() {
                     />
                   </Field>
                 ))}
+                <Field label="Company">
+                  <div className="flex h-8 items-center rounded-[var(--radius-sm)] border border-input bg-muted/40 px-2.5 text-sm">
+                    {contact.companyId && contact.company ? (
+                      <Link
+                        to={`/companies/${contact.companyId}`}
+                        className="truncate font-medium text-foreground underline-offset-2 hover:underline"
+                      >
+                        {contact.company}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">No company</span>
+                    )}
+                  </div>
+                </Field>
               </div>
               <Field
                 label="Hook"

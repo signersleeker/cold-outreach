@@ -2,6 +2,8 @@ import type * as React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useSession } from '@/hooks';
+import { CompaniesPage } from '@/pages/CompaniesPage';
+import { CompanyDetailPage } from '@/pages/CompanyDetailPage';
 import { ContactDetailPage } from '@/pages/ContactDetailPage';
 import { ContactsPage } from '@/pages/ContactsPage';
 import { DashboardPage } from '@/pages/DashboardPage';
@@ -53,6 +55,22 @@ export function App() {
         element={
           <RequireAuth>
             <ContactDetailPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/companies"
+        element={
+          <RequireAuth>
+            <CompaniesPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/companies/:id"
+        element={
+          <RequireAuth>
+            <CompanyDetailPage />
           </RequireAuth>
         }
       />

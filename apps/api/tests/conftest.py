@@ -181,21 +181,28 @@ def follow_up_template(db: Session) -> Template:
 @pytest.fixture
 def make_contact(db: Session):
     def _make(**overrides) -> Contact:
+        from app.companies import service as companies_service
+
         fields = {
             "email": "avery.stone@northwind.example",
             "first_name": "Avery",
             "last_name": "Stone",
-            "company": "Northwind Mutual",
             "title": "CISO",
             "hook": "CPS 234 uplift",
             "source": "https://example.com/leadership",
             "validation_status": "valid",
             "unsub_token": new_unsub_token(),
         }
+        company_name = overrides.pop("company", "Northwind Mutual")
         fields.update(overrides)
         contact = Contact(**fields)
+        if company_name:
+            company = companies_service.find_or_create(db, company_name)
+            contact.company_id = company.id if company is not None else None
+            contact.company_ref = company
         db.add(contact)
         db.commit()
+        db.refresh(contact)
         return contact
 
     return _make

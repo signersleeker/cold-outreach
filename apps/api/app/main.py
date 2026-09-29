@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from app.app_settings.router import router as settings_router
 from app.auth.router import router as auth_router
 from app.auth.service import LoginThrottle
+from app.companies.router import router as companies_router
 from app.config import get_settings
 from app.contacts.router import router as contacts_router
 from app.dashboard.router import router as dashboard_router
@@ -37,6 +38,7 @@ API_PREFIX = "/api/v1"
 _API_ROUTERS = (
     dashboard_router,
     contacts_router,
+    companies_router,
     templates_router,
     sends_router,
     suppressions_router,

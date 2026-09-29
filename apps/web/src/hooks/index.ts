@@ -68,6 +68,7 @@ function useContactMutation<TArgs>(mutationFn: (args: TArgs) => Promise<Contact>
     onSuccess: (contact) => {
       client.setQueryData(queryKeys.contact(contact.id), contact);
       client.invalidateQueries({ queryKey: ['contacts'] });
+      client.invalidateQueries({ queryKey: ['companies'] });
       client.invalidateQueries({ queryKey: queryKeys.dashboard });
       client.invalidateQueries({ queryKey: queryKeys.suppressions });
       client.invalidateQueries({ queryKey: ['send-preview'] });
@@ -95,6 +96,7 @@ export function useCreateContact() {
     onSuccess: (contact) => {
       client.setQueryData(queryKeys.contact(contact.id), contact);
       client.invalidateQueries({ queryKey: ['contacts'] });
+      client.invalidateQueries({ queryKey: ['companies'] });
       client.invalidateQueries({ queryKey: queryKeys.dashboard });
     },
   });
@@ -117,11 +119,43 @@ export function useDeleteContact() {
 export function useImportContacts() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => api.importContacts(file),
+    mutationFn: ({ file, mapping }: { file: File; mapping: Record<string, string> }) =>
+      api.importContacts(file, mapping),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ['contacts'] });
+      client.invalidateQueries({ queryKey: ['companies'] });
       client.invalidateQueries({ queryKey: queryKeys.dashboard });
       client.invalidateQueries({ queryKey: queryKeys.suppressions });
+    },
+  });
+}
+
+export function usePreviewImport() {
+  return useMutation({
+    mutationFn: (file: File) => api.previewImport(file),
+  });
+}
+
+export const useCompanies = (params: { q?: string; limit?: number; offset?: number }) =>
+  useQuery({
+    queryKey: queryKeys.companies(params),
+    queryFn: () => api.companies(params),
+  });
+
+export const useCompany = (id: string) =>
+  useQuery({
+    queryKey: queryKeys.company(id),
+    queryFn: () => api.company(id),
+    enabled: !!id,
+  });
+
+export function useCreateCompany() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api.createCompany(name),
+    onSuccess: (company) => {
+      client.setQueryData(queryKeys.company(company.id), company);
+      client.invalidateQueries({ queryKey: ['companies'] });
     },
   });
 }

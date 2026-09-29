@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, File, Query, Response, UploadFile
+from fastapi import APIRouter, File, Form, Query, Response, UploadFile
 
 from app.constants import MAX_CSV_BYTES
 from app.contacts import service
 from app.contacts.constants import CONTACT_FILTERS
-from app.contacts.csv_import import CsvFormatError
+from app.contacts.csv_import import CsvFormatError, parse_mapping_json, preview_csv
 from app.contacts.schemas import (
     ContactCreateRequest,
     ContactDTO,
     ContactPatchRequest,
+    ImportPreviewDTO,
     ImportSummaryDTO,
     SuppressContactRequest,
 )
@@ -29,12 +30,15 @@ def list_contacts(
     db: DbSession,
     q: str = Query(default=""),
     status: str = Query(default="all"),
+    company_id: uuid.UUID | None = Query(default=None, alias="companyId"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> Response:
     if status not in CONTACT_FILTERS:
         raise AppError(400, f"unknown filter {status!r}")
-    rows, total = service.search(db, q=q, status=status, limit=limit, offset=offset)
+    rows, total = service.search(
+        db, q=q, status=status, company_id=company_id, limit=limit, offset=offset
+    )
     return list_body(
         [ContactDTO.model_validate(row) for row in rows],
         {"total": total, "limit": limit, "offset": offset},
@@ -61,28 +65,50 @@ def create_contact(
     return data_body(ContactDTO.model_validate(contact), status_code=201)
 
 
-@router.post("/contacts/import")
-async def import_contacts(
-    db: DbSession,
-    validator: ValidatorDep,
-    clock: ClockDep,
-    file: UploadFile = File(...),
-) -> Response:
-    content = await file.read()
+def _read_upload(content: bytes) -> None:
     if not content:
         raise AppError(400, "the uploaded file is empty")
     if len(content) > MAX_CSV_BYTES:
         raise AppError(
             413, f"file is larger than {MAX_CSV_BYTES // 1024 // 1024} MB; split it up"
         )
+
+
+@router.post("/contacts/import/preview")
+async def preview_import(file: UploadFile = File(...)) -> Response:
+    content = await file.read()
+    _read_upload(content)
     try:
-        summary = service.import_csv(db, content, validator=validator, clock=clock)
+        preview = preview_csv(content)
+    except CsvFormatError as exc:
+        raise AppError(400, str(exc)) from exc
+    return data_body(
+        ImportPreviewDTO(headers=preview.headers, suggestions=preview.suggestions)
+    )
+
+
+@router.post("/contacts/import")
+async def import_contacts(
+    db: DbSession,
+    validator: ValidatorDep,
+    clock: ClockDep,
+    file: UploadFile = File(...),
+    mapping: str | None = Form(default=None),
+) -> Response:
+    content = await file.read()
+    _read_upload(content)
+    try:
+        column_map = parse_mapping_json(mapping)
+        summary = service.import_csv(
+            db, content, validator=validator, clock=clock, column_map=column_map
+        )
     except CsvFormatError as exc:
         raise AppError(400, str(exc)) from exc
     return data_body(
         ImportSummaryDTO(
             created=summary.created,
             skipped_dupes=summary.skipped_dupes,
+            skipped_existing_company=summary.skipped_existing_company,
             invalid=summary.invalid,
             risky=summary.risky,
             valid=summary.valid,

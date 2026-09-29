@@ -70,6 +70,7 @@ export interface Contact {
   firstName: string;
   lastName: string;
   company: string;
+  companyId: string | null;
   title: string;
   source: string;
   notes: string;
@@ -208,6 +209,7 @@ export interface Dashboard {
 export interface ImportSummary {
   created: number;
   skippedDupes: number;
+  skippedExistingCompany: number;
   invalid: number;
   risky: number;
   valid: number;
@@ -217,6 +219,25 @@ export interface ImportSummary {
   truncated: boolean;
   validator: string;
   headersRecognised: Record<string, string>;
+}
+
+export interface ImportPreview {
+  headers: string[];
+  suggestions: Record<string, string | null>;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  contactCount: number;
+  createdAt: string;
+}
+
+export interface CompanyDetail {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface InboxSyncSummary {
@@ -245,10 +266,17 @@ export const api = {
   syncInbox: () => unwrap<InboxSyncSummary>('/api/v1/inbox/sync', { method: 'POST' }),
 
   // contacts
-  contacts: (params: { q?: string; status?: ContactFilter; limit?: number; offset?: number }) => {
+  contacts: (params: {
+    q?: string;
+    status?: ContactFilter;
+    companyId?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
     const query = new URLSearchParams();
     if (params.q) query.set('q', params.q);
     if (params.status && params.status !== 'all') query.set('status', params.status);
+    if (params.companyId) query.set('companyId', params.companyId);
     query.set('limit', String(params.limit ?? 50));
     query.set('offset', String(params.offset ?? 0));
     return unwrapList<Contact[], { total: number; limit: number; offset: number }>(
@@ -272,11 +300,37 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ reason, note }),
     }),
-  importContacts: (file: File) => {
+  previewImport: (file: File) => {
     const form = new FormData();
     form.append('file', file);
+    return unwrap<ImportPreview>('/api/v1/contacts/import/preview', {
+      method: 'POST',
+      body: form,
+    });
+  },
+  importContacts: (file: File, mapping: Record<string, string>) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mapping', JSON.stringify(mapping));
     return unwrap<ImportSummary>('/api/v1/contacts/import', { method: 'POST', body: form });
   },
+
+  // companies
+  companies: (params: { q?: string; limit?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.q) query.set('q', params.q);
+    query.set('limit', String(params.limit ?? 50));
+    query.set('offset', String(params.offset ?? 0));
+    return unwrapList<Company[], { total: number; limit: number; offset: number }>(
+      `/api/v1/companies?${query}`,
+    );
+  },
+  company: (id: string) => unwrap<CompanyDetail>(`/api/v1/companies/${id}`),
+  createCompany: (name: string) =>
+    unwrap<CompanyDetail>('/api/v1/companies', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
 
   // templates
   templates: () => unwrapList<Template[], unknown>('/api/v1/templates'),

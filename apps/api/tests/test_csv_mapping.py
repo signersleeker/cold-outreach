@@ -9,6 +9,7 @@ from app.contacts.csv_import import (
     build_column_map,
     normalize_header,
     parse_csv,
+    preview_csv,
 )
 from app.contacts.normalize import normalize_email, split_full_name
 
@@ -70,6 +71,59 @@ def test_email_column_is_required() -> None:
 def test_error_names_the_columns_it_did_recognise() -> None:
     with pytest.raises(CsvFormatError, match="company"):
         parse("First Name,Company\nAvery,Northwind\n")
+
+
+def test_explicit_mapping_uses_operator_choices() -> None:
+    result = parse_csv(
+        b"Work Address,Org,Person\na@example.com,Northwind,Avery Stone\n",
+        max_rows=MAX_ROWS,
+        column_map={
+            "Work Address": "email",
+            "Org": "company",
+            "Person": "full_name",
+        },
+    )
+    row = result.rows[0]
+    assert row.email == "a@example.com"
+    assert row.company == "Northwind"
+    assert (row.first_name, row.last_name) == ("Avery", "Stone")
+
+
+def test_explicit_mapping_requires_email() -> None:
+    with pytest.raises(CsvFormatError, match="No email column"):
+        parse_csv(
+            b"Org,Person\nNorthwind,Avery\n",
+            max_rows=MAX_ROWS,
+            column_map={"Org": "company", "Person": "first_name"},
+        )
+
+
+def test_duplicate_field_mapping_is_rejected() -> None:
+    with pytest.raises(CsvFormatError, match="more than one"):
+        parse_csv(
+            b"Email,Work Email\na@example.com,b@example.com\n",
+            max_rows=MAX_ROWS,
+            column_map={"Email": "email", "Work Email": "email"},
+        )
+
+
+def test_company_column_is_optional() -> None:
+    result = parse("Email,First Name\na@example.com,Avery\n")
+    assert result.rows[0].company == ""
+
+
+def test_blank_company_cell_yields_empty_company() -> None:
+    result = parse("Email,Company\na@example.com,\nb@example.com,Northwind\n")
+    assert result.rows[0].company == ""
+    assert result.rows[1].company == "Northwind"
+
+
+def test_preview_suggests_aliases() -> None:
+    preview = preview_csv(b"Work Email,Company Name,Lead Score\n")
+    assert preview.headers == ["Work Email", "Company Name", "Lead Score"]
+    assert preview.suggestions["Work Email"] == "email"
+    assert preview.suggestions["Company Name"] == "company"
+    assert preview.suggestions["Lead Score"] is None
 
 
 def test_empty_file_is_rejected() -> None:

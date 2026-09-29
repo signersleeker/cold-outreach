@@ -1,4 +1,5 @@
 import {
+  Building2,
   FileText,
   Gauge,
   LogOut,
@@ -16,6 +17,7 @@ import { Button } from './ui/button';
 const NAV = [
   { to: '/', label: 'Dashboard', icon: Gauge, end: true },
   { to: '/contacts', label: 'Contacts', icon: Users, end: false },
+  { to: '/companies', label: 'Companies', icon: Building2, end: false },
   { to: '/templates', label: 'Templates', icon: FileText, end: false },
   { to: '/suppressions', label: 'Suppressions', icon: ShieldBan, end: false },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, end: false },

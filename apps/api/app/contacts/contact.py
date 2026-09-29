@@ -3,9 +3,9 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Index, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.contacts.constants import VALIDATION_PENDING
 from app.database import Base
@@ -17,6 +17,7 @@ class Contact(Base):
         CheckConstraint("email = lower(email)", name="ck_contacts_email_lower"),
         Index("ix_contacts_validation_status", "validation_status"),
         Index("ix_contacts_suppressed", "suppressed"),
+        Index("ix_contacts_company_id", "company_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -26,7 +27,11 @@ class Contact(Base):
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
     first_name: Mapped[str] = mapped_column(String(120), nullable=False, server_default="")
     last_name: Mapped[str] = mapped_column(String(120), nullable=False, server_default="")
-    company: Mapped[str] = mapped_column(String(200), nullable=False, server_default="")
+    company_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True),
+        ForeignKey("companies.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     title: Mapped[str] = mapped_column(String(200), nullable=False, server_default="")
 
     # source and notes are the Spam Act evidence trail: where this address came
@@ -60,3 +65,10 @@ class Contact(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
+    company_ref = relationship("Company", back_populates="contacts")
+
+    @property
+    def company(self) -> str:
+        """Company name for merge tags, DTOs, and the send gate."""
+        return self.company_ref.name if self.company_ref is not None else ""

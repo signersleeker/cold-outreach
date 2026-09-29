@@ -19,21 +19,23 @@ def test_upgrade_is_idempotent(engine: Engine) -> None:
 def test_status_lists_every_migration(engine: Engine) -> None:
     rows = status(engine)
     versions = [v for v, _, _ in rows]
-    assert versions == ["0001", "0002"]
+    assert versions == ["0001", "0002", "0003"]
     assert all(applied for _, _, applied in rows)
 
 
-def test_downgrade_one_step_removes_include_unsub_link(engine: Engine) -> None:
+def test_downgrade_one_step_removes_companies(engine: Engine) -> None:
     upgrade(engine)
-    assert "include_unsub_link" in {c["name"] for c in inspect(engine).get_columns("settings")}
+    assert "companies" in inspect(engine).get_table_names()
 
     rolled = downgrade(engine, steps=1)
-    assert rolled == ["0002"]
-    assert "include_unsub_link" not in {c["name"] for c in inspect(engine).get_columns("settings")}
+    assert rolled == ["0003"]
+    assert "companies" not in inspect(engine).get_table_names()
+    assert "company" in {c["name"] for c in inspect(engine).get_columns("contacts")}
 
     # Re-apply so later tests still see the full schema.
     upgrade(engine)
-    assert "include_unsub_link" in {c["name"] for c in inspect(engine).get_columns("settings")}
+    assert "companies" in inspect(engine).get_table_names()
+    assert "company_id" in {c["name"] for c in inspect(engine).get_columns("contacts")}
 
 
 def test_initial_up_skips_existing_tables(engine: Engine) -> None:
@@ -62,6 +64,45 @@ def test_initial_up_skips_existing_tables(engine: Engine) -> None:
     assert name == "Keep Me"
 
 
+def test_companies_migration_backfills_existing_names(engine: Engine) -> None:
+    """Downgrade past companies, seed a string company, upgrade and check the FK."""
+    upgrade(engine)
+    downgrade(engine, steps=1)
+    assert "company" in {c["name"] for c in inspect(engine).get_columns("contacts")}
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO contacts (email, company, unsub_token) VALUES "
+                "('a@northwind.example', 'Northwind', 'tok-a'), "
+                "('b@northwind.example', 'northwind', 'tok-b'), "
+                "('c@solo.example', '', 'tok-c')"
+            )
+        )
+
+    upgrade(engine)
+    with engine.begin() as conn:
+        names = [
+            r[0]
+            for r in conn.execute(text("SELECT name FROM companies ORDER BY lower(name)")).fetchall()
+        ]
+        assert names == ["Northwind"]
+        linked = conn.execute(
+            text("SELECT email, company_id IS NOT NULL FROM contacts ORDER BY email")
+        ).fetchall()
+        assert linked == [
+            ("a@northwind.example", True),
+            ("b@northwind.example", True),
+            ("c@solo.example", False),
+        ]
+        shared = conn.execute(
+            text(
+                "SELECT count(DISTINCT company_id) FROM contacts WHERE company_id IS NOT NULL"
+            )
+        ).scalar()
+        assert shared == 1
+
+
 def test_full_downgrade_and_upgrade_round_trip(engine: Engine) -> None:
     upgrade(engine)
     with engine.begin() as conn:
@@ -75,6 +116,7 @@ def test_full_downgrade_and_upgrade_round_trip(engine: Engine) -> None:
     assert "contacts" not in inspector.get_table_names()
 
     applied = upgrade(engine)
-    assert applied == ["0001", "0002"]
+    assert applied == ["0001", "0002", "0003"]
     assert "settings" in inspect(engine).get_table_names()
+    assert "companies" in inspect(engine).get_table_names()
     assert "include_unsub_link" in {c["name"] for c in inspect(engine).get_columns("settings")}

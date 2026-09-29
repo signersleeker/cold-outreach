@@ -14,6 +14,7 @@ class ContactDTO(CamelModel):
     first_name: str
     last_name: str
     company: str
+    company_id: uuid.UUID | None = None
     title: str
     source: str
     notes: str
@@ -57,6 +58,7 @@ class SuppressContactRequest(CamelModel):
 class ImportSummaryDTO(CamelModel):
     created: int
     skipped_dupes: int
+    skipped_existing_company: int = 0
     invalid: int
     risky: int
     valid: int
@@ -66,3 +68,8 @@ class ImportSummaryDTO(CamelModel):
     truncated: bool
     validator: str
     headers_recognised: dict[str, str]
+
+
+class ImportPreviewDTO(CamelModel):
+    headers: list[str]
+    suggestions: dict[str, str | None]

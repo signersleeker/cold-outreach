@@ -1,5 +1,5 @@
 import { Ban, Send, Upload } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ErrorBanner, PageHeader } from '@/components/AppLayout';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Card, EmptyState } from '@/components/ui/card';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
-import { useContacts, useImportContacts, useSuppressContact } from '@/hooks';
+import { useContacts, useImportContacts, usePreviewImport, useSuppressContact } from '@/hooks';
 import type { Contact, ContactFilter } from '@/lib/api';
 import { formatRelative, fullName, plural } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -27,17 +28,48 @@ const FILTERS: { value: ContactFilter; label: string }[] = [
 
 const PAGE_SIZE = 50;
 
+const IMPORT_FIELDS: { value: string; label: string }[] = [
+  { value: 'ignore', label: 'Ignore' },
+  { value: 'email', label: 'Email' },
+  { value: 'company', label: 'Company name' },
+  { value: 'first_name', label: 'First name' },
+  { value: 'last_name', label: 'Last name' },
+  { value: 'full_name', label: 'Full name' },
+  { value: 'title', label: 'Title' },
+  { value: 'hook', label: 'Hook' },
+  { value: 'notes', label: 'Notes' },
+  { value: 'source', label: 'Source' },
+];
+
 function ImportDialog() {
   const [open, setOpen] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
   const fileInput = useRef<HTMLInputElement>(null);
+  const preview = usePreviewImport();
   const importer = useImportContacts();
+
+  const emailMappedOnce = useMemo(
+    () => Object.values(mapping).filter((field) => field === 'email').length === 1,
+    [mapping],
+  );
+
+  function reset() {
+    setFile(null);
+    setHeaders([]);
+    setMapping({});
+    preview.reset();
+    importer.reset();
+    if (fileInput.current) fileInput.current.value = '';
+  }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) importer.reset();
+        if (next) reset();
       }}
     >
       <Button variant="outline" onClick={() => setOpen(true)}>
@@ -46,7 +78,7 @@ function ImportDialog() {
       </Button>
       <DialogContent
         title="Import prospects"
-        description="Only an email column is required. Common header spellings are mapped automatically."
+        description="Only an email column is required. Confirm how each header maps before importing."
       >
         <DialogBody className="space-y-3">
           <input
@@ -54,6 +86,25 @@ function ImportDialog() {
             type="file"
             accept=".csv,text/csv"
             className="block w-full text-xs file:mr-3 file:rounded-[var(--radius-sm)] file:border file:border-input file:bg-card file:px-2.5 file:py-1.5 file:text-xs"
+            onChange={(event) => {
+              const next = event.target.files?.[0] ?? null;
+              setFile(next);
+              setHeaders([]);
+              setMapping({});
+              importer.reset();
+              if (next) {
+                preview.mutate(next, {
+                  onSuccess: (data) => {
+                    setHeaders(data.headers);
+                    const initial: Record<string, string> = {};
+                    for (const header of data.headers) {
+                      initial[header] = data.suggestions[header] ?? 'ignore';
+                    }
+                    setMapping(initial);
+                  },
+                });
+              }
+            }}
           />
           <p className="text-xs text-muted-foreground">
             Every new address is validated on import. Invalid ones are suppressed automatically.
@@ -61,7 +112,42 @@ function ImportDialog() {
             your evidence for why contacting this person is defensible.
           </p>
 
-          <ErrorBanner error={importer.error} />
+          <ErrorBanner error={preview.error ?? importer.error} />
+
+          {headers.length > 0 && !importer.data ? (
+            <div className="space-y-2">
+              <p className="text-xs font-medium">Map columns</p>
+              <div className="max-h-64 space-y-2 overflow-y-auto rounded-[var(--radius-sm)] border p-2">
+                {headers.map((header) => (
+                  <div key={header} className="grid grid-cols-[1fr_10rem] items-center gap-2">
+                    <span className="truncate font-mono text-xs" title={header}>
+                      {header || '(empty)'}
+                    </span>
+                    <Select
+                      value={mapping[header] ?? 'ignore'}
+                      onValueChange={(value) =>
+                        setMapping((current) => ({ ...current, [header]: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IMPORT_FIELDS.map((field) => (
+                          <SelectItem key={field.value} value={field.value}>
+                            {field.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+              {!emailMappedOnce ? (
+                <p className="text-xs text-warning">Map exactly one column to Email.</p>
+              ) : null}
+            </div>
+          ) : null}
 
           {importer.data ? (
             <div className="space-y-2 rounded-[var(--radius-sm)] border bg-muted/40 px-3 py-2 text-xs">
@@ -69,6 +155,9 @@ function ImportDialog() {
               <ul className="space-y-0.5 font-mono">
                 <li>created: {importer.data.created}</li>
                 <li>skipped duplicates: {importer.data.skippedDupes}</li>
+                {importer.data.skippedExistingCompany > 0 ? (
+                  <li>skipped existing company: {importer.data.skippedExistingCompany}</li>
+                ) : null}
                 <li>valid: {importer.data.valid}</li>
                 <li>risky: {importer.data.risky}</li>
                 <li>invalid (auto-suppressed): {importer.data.invalid}</li>
@@ -100,15 +189,22 @@ function ImportDialog() {
             <Button variant="outline" onClick={() => setOpen(false)}>
               {importer.data ? 'Done' : 'Cancel'}
             </Button>
-            <Button
-              disabled={importer.isPending}
-              onClick={() => {
-                const file = fileInput.current?.files?.[0];
-                if (file) importer.mutate(file);
-              }}
-            >
-              {importer.isPending ? 'Importing…' : 'Import'}
-            </Button>
+            {!importer.data ? (
+              <Button
+                disabled={
+                  !file ||
+                  !emailMappedOnce ||
+                  preview.isPending ||
+                  importer.isPending ||
+                  headers.length === 0
+                }
+                onClick={() => {
+                  if (file) importer.mutate({ file, mapping });
+                }}
+              >
+                {importer.isPending ? 'Importing…' : preview.isPending ? 'Reading…' : 'Import'}
+              </Button>
+            ) : null}
           </div>
         </DialogFooter>
       </DialogContent>
@@ -268,7 +364,18 @@ export function ContactsPage() {
                         </Link>
                       </Td>
                       <Td className="whitespace-nowrap">{fullName(contact) || '—'}</Td>
-                      <Td>{contact.company || '—'}</Td>
+                      <Td>
+                        {contact.companyId ? (
+                          <Link
+                            to={`/companies/${contact.companyId}`}
+                            className="hover:underline"
+                          >
+                            {contact.company}
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </Td>
                       <Td>{contact.title || '—'}</Td>
                       <Td>
                         <ValidationBadge contact={contact} />
