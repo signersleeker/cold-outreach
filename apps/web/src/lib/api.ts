@@ -71,6 +71,7 @@ export interface Contact {
   lastName: string;
   company: string;
   companyId: string | null;
+  companyIndustry: string;
   title: string;
   source: string;
   notes: string;
@@ -110,8 +111,25 @@ export interface Template {
   name: string;
   subject: string;
   body: string;
+  industry: string;
   referencedVars: string[];
   unknownVars: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TemplateGroupItem {
+  position: number;
+  templateId: string;
+  templateName: string;
+  subject: string;
+  industry: string;
+}
+
+export interface TemplateGroup {
+  id: string;
+  name: string;
+  items: TemplateGroupItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -229,6 +247,8 @@ export interface ImportPreview {
 export interface Company {
   id: string;
   name: string;
+  website: string;
+  industry: string;
   contactCount: number;
   createdAt: string;
 }
@@ -236,8 +256,16 @@ export interface Company {
 export interface CompanyDetail {
   id: string;
   name: string;
+  website: string;
+  industry: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CompanyInput {
+  name: string;
+  website?: string;
+  industry?: string;
 }
 
 export interface InboxSyncSummary {
@@ -308,10 +336,15 @@ export const api = {
       body: form,
     });
   },
-  importContacts: (file: File, mapping: Record<string, string>) => {
+  importContacts: (
+    file: File,
+    mapping: Record<string, string>,
+    skipValidation = false,
+  ) => {
     const form = new FormData();
     form.append('file', file);
     form.append('mapping', JSON.stringify(mapping));
+    if (skipValidation) form.append('skipValidation', 'true');
     return unwrap<ImportSummary>('/api/v1/contacts/import', { method: 'POST', body: form });
   },
 
@@ -326,23 +359,48 @@ export const api = {
     );
   },
   company: (id: string) => unwrap<CompanyDetail>(`/api/v1/companies/${id}`),
-  createCompany: (name: string) =>
+  createCompany: (input: CompanyInput) =>
     unwrap<CompanyDetail>('/api/v1/companies', {
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(input),
+    }),
+  updateCompany: (id: string, changes: Partial<CompanyInput>) =>
+    unwrap<CompanyDetail>(`/api/v1/companies/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
     }),
 
   // templates
   templates: () => unwrapList<Template[], unknown>('/api/v1/templates'),
-  createTemplate: (input: { name: string; subject: string; body: string }) =>
+  createTemplate: (input: { name: string; subject: string; body: string; industry: string }) =>
     unwrap<Template>('/api/v1/templates', { method: 'POST', body: JSON.stringify(input) }),
-  updateTemplate: (id: string, input: Partial<{ name: string; subject: string; body: string }>) =>
+  updateTemplate: (
+    id: string,
+    input: Partial<{ name: string; subject: string; body: string; industry: string }>,
+  ) =>
     unwrap<Template>(`/api/v1/templates/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(input),
     }),
   deleteTemplate: (id: string) =>
     unwrap<{ deleted: boolean }>(`/api/v1/templates/${id}`, { method: 'DELETE' }),
+
+  templateGroups: () => unwrapList<TemplateGroup[], unknown>('/api/v1/template-groups'),
+  createTemplateGroup: (input: { name: string; templateIds: string[] }) =>
+    unwrap<TemplateGroup>('/api/v1/template-groups', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  updateTemplateGroup: (
+    id: string,
+    input: Partial<{ name: string; templateIds: string[] }>,
+  ) =>
+    unwrap<TemplateGroup>(`/api/v1/template-groups/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+  deleteTemplateGroup: (id: string) =>
+    unwrap<{ deleted: boolean }>(`/api/v1/template-groups/${id}`, { method: 'DELETE' }),
 
   // sends
   previewSend: (input: { contactId: string; templateId: string; acknowledge: string[] }) =>

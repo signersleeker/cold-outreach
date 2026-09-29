@@ -24,6 +24,7 @@ def _to_dto(template: Template) -> TemplateWithVarsDTO:
         name=template.name,
         subject=template.subject,
         body=template.body,
+        industry=template.industry,
         created_at=template.created_at,
         updated_at=template.updated_at,
         referenced_vars=list(referenced_vars(template.subject, template.body)),
@@ -39,7 +40,11 @@ def list_templates(db: DbSession) -> Response:
 @router.post("/templates")
 def create_template(payload: TemplateCreateRequest, db: DbSession) -> Response:
     template = service.create(
-        db, name=payload.name, subject=payload.subject, body=payload.body
+        db,
+        name=payload.name,
+        subject=payload.subject,
+        body=payload.body,
+        industry=payload.industry,
     )
     return data_body(_to_dto(template), status_code=201)
 
@@ -54,7 +59,12 @@ def patch_template(
     template_id: uuid.UUID, payload: TemplatePatchRequest, db: DbSession
 ) -> Response:
     template = service.update(
-        db, template_id, name=payload.name, subject=payload.subject, body=payload.body
+        db,
+        template_id,
+        name=payload.name,
+        subject=payload.subject,
+        body=payload.body,
+        industry=payload.industry,
     )
     return data_body(_to_dto(template))
 

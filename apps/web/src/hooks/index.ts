@@ -2,7 +2,13 @@
  * One hook per resource. Components never call fetch and never build query keys.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type AppSettings, type Contact, type NewContact, api } from '@/lib/api';
+import {
+  type AppSettings,
+  type CompanyInput,
+  type Contact,
+  type NewContact,
+  api,
+} from '@/lib/api';
 import { type ContactsQuery, queryKeys } from '@/lib/query-keys';
 
 // ------------------------------------------------------------------- auth ----
@@ -119,8 +125,15 @@ export function useDeleteContact() {
 export function useImportContacts() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ file, mapping }: { file: File; mapping: Record<string, string> }) =>
-      api.importContacts(file, mapping),
+    mutationFn: ({
+      file,
+      mapping,
+      skipValidation,
+    }: {
+      file: File;
+      mapping: Record<string, string>;
+      skipValidation?: boolean;
+    }) => api.importContacts(file, mapping, skipValidation ?? false),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ['contacts'] });
       client.invalidateQueries({ queryKey: ['companies'] });
@@ -152,10 +165,23 @@ export const useCompany = (id: string) =>
 export function useCreateCompany() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => api.createCompany(name),
+    mutationFn: (input: CompanyInput) => api.createCompany(input),
     onSuccess: (company) => {
       client.setQueryData(queryKeys.company(company.id), company);
       client.invalidateQueries({ queryKey: ['companies'] });
+    },
+  });
+}
+
+export function useUpdateCompany() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...changes }: { id: string } & Partial<CompanyInput>) =>
+      api.updateCompany(id, changes),
+    onSuccess: (company) => {
+      client.setQueryData(queryKeys.company(company.id), company);
+      client.invalidateQueries({ queryKey: ['companies'] });
+      client.invalidateQueries({ queryKey: ['contacts'] });
     },
   });
 }
@@ -168,17 +194,51 @@ export function useTemplateMutations() {
   const client = useQueryClient();
   const invalidate = () => {
     client.invalidateQueries({ queryKey: queryKeys.templates });
+    client.invalidateQueries({ queryKey: queryKeys.templateGroups });
     client.invalidateQueries({ queryKey: ['send-preview'] });
   };
 
   return {
     create: useMutation({ mutationFn: api.createTemplate, onSuccess: invalidate }),
     update: useMutation({
-      mutationFn: ({ id, ...input }: { id: string; name?: string; subject?: string; body?: string }) =>
-        api.updateTemplate(id, input),
+      mutationFn: ({
+        id,
+        ...input
+      }: {
+        id: string;
+        name?: string;
+        subject?: string;
+        body?: string;
+        industry?: string;
+      }) => api.updateTemplate(id, input),
       onSuccess: invalidate,
     }),
     remove: useMutation({ mutationFn: api.deleteTemplate, onSuccess: invalidate }),
+  };
+}
+
+export const useTemplateGroups = () =>
+  useQuery({ queryKey: queryKeys.templateGroups, queryFn: api.templateGroups });
+
+export function useTemplateGroupMutations() {
+  const client = useQueryClient();
+  const invalidate = () => {
+    client.invalidateQueries({ queryKey: queryKeys.templateGroups });
+  };
+  return {
+    create: useMutation({ mutationFn: api.createTemplateGroup, onSuccess: invalidate }),
+    update: useMutation({
+      mutationFn: ({
+        id,
+        ...input
+      }: {
+        id: string;
+        name?: string;
+        templateIds?: string[];
+      }) => api.updateTemplateGroup(id, input),
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({ mutationFn: api.deleteTemplateGroup, onSuccess: invalidate }),
   };
 }
 
@@ -209,10 +269,11 @@ export function useSend() {
   });
 }
 
-export const useSendHistory = (contactId?: string) =>
+export const useSendHistory = (contactId?: string, enabled = true) =>
   useQuery({
     queryKey: queryKeys.sendHistory(contactId),
     queryFn: () => api.sendHistory(contactId),
+    enabled,
   });
 
 // ------------------------------------------------------------ suppressions ----

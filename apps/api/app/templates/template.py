@@ -19,6 +19,8 @@ class Template(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
     subject: Mapped[str] = mapped_column(String(300), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    # Blank means the template is not tied to an industry.
+    industry: Mapped[str] = mapped_column(String(80), nullable=False, server_default="", default="")
 
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

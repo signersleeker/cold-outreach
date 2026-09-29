@@ -25,6 +25,12 @@ ValidationStatus = Literal["valid", "invalid", "risky", "unknown"]
 class ValidationResult:
     status: ValidationStatus
     detail: str
+    # A transport failure is not durable: the contact can show `unknown`, but
+    # nothing is written to email_validations, so a later import tries again.
+    durable: bool = True
+    provider_status: str = ""
+    provider_sub_status: str = ""
+    provider_payload: dict | None = None
 
     @classmethod
     def valid(cls, detail: str) -> ValidationResult:
@@ -39,8 +45,8 @@ class ValidationResult:
         return cls(VALIDATION_RISKY, detail)
 
     @classmethod
-    def unknown(cls, detail: str) -> ValidationResult:
-        return cls(VALIDATION_UNKNOWN, detail)
+    def unknown(cls, detail: str, *, durable: bool = True) -> ValidationResult:
+        return cls(VALIDATION_UNKNOWN, detail, durable=durable)
 
 
 class EmailValidator(Protocol):

@@ -1,9 +1,10 @@
 import { AlertTriangle, Ban, Send } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useSend, useSendPreview, useTemplates } from '@/hooks';
+import { useSend, useSendHistory, useSendPreview, useTemplateGroups, useTemplates } from '@/hooks';
 import type { Contact, GateFinding } from '@/lib/api';
 import { fullName } from '@/lib/format';
 import { gateLabel } from '@/lib/gates';
+import { cn } from '@/lib/utils';
 import { ErrorBanner } from './AppLayout';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -46,23 +47,53 @@ export function SendModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const { data: templates } = useTemplates();
+  const { data: groupsData } = useTemplateGroups();
+  const { data: history } = useSendHistory(contact.id, open);
+  const [mode, setMode] = useState<'template' | 'group'>('template');
+  const [groupId, setGroupId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [acknowledged, setAcknowledged] = useState<string[]>([]);
   const send = useSend();
 
   const list = templates?.data ?? [];
+  const groups = groupsData?.data ?? [];
+  const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
+  const selectedTemplate = list.find((template) => template.id === templateId) ?? null;
+
+  const sentTemplateIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const event of history?.data ?? []) {
+      if (event.status === 'sent' && event.templateId) ids.add(event.templateId);
+    }
+    return ids;
+  }, [history]);
 
   useEffect(() => {
-    if (!templateId && list.length > 0) setTemplateId(list[0].id);
-  }, [list, templateId]);
+    if (!templateId && list.length > 0 && mode === 'template') setTemplateId(list[0].id);
+  }, [list, templateId, mode]);
+
+  useEffect(() => {
+    if (mode === 'group' && !groupId && groups[0]) setGroupId(groups[0].id);
+  }, [mode, groupId, groups]);
+
+  useEffect(() => {
+    if (mode !== 'group' || !selectedGroup) return;
+    const inGroup = selectedGroup.items.some((item) => item.templateId === templateId);
+    if (!inGroup) setTemplateId(selectedGroup.items[0]?.templateId ?? '');
+  }, [mode, selectedGroup, templateId]);
 
   // Reset per-open so an acknowledgement never leaks between contacts.
   useEffect(() => {
     if (open) {
       setAcknowledged([]);
+      setMode('template');
       send.reset();
     }
   }, [open]);
+
+  useEffect(() => {
+    setAcknowledged([]);
+  }, [templateId]);
 
   const preview = useSendPreview(contact.id, templateId, acknowledged);
   const data = preview.data;
@@ -87,21 +118,115 @@ export function SendModal({
         description={contact.email}
       >
         <DialogBody className="space-y-4">
-          <div className="flex flex-col gap-1">
-            <Label>Template</Label>
-            <Select value={templateId} onValueChange={setTemplateId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a template" />
-              </SelectTrigger>
-              <SelectContent>
-                {list.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {contact.companyIndustry ? (
+            <p className="text-xs text-muted-foreground">
+              Company industry:{' '}
+              <span className="font-medium text-foreground">{contact.companyIndustry}</span>
+            </p>
+          ) : null}
+
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant={mode === 'template' ? 'default' : 'outline'}
+              onClick={() => setMode('template')}
+            >
+              Template
+            </Button>
+            <Button
+              size="sm"
+              variant={mode === 'group' ? 'default' : 'outline'}
+              onClick={() => {
+                setMode('group');
+                if (!groupId && groups[0]) setGroupId(groups[0].id);
+              }}
+            >
+              Group
+            </Button>
           </div>
+
+          {mode === 'template' ? (
+            <div className="flex flex-col gap-1">
+              <Label>Template</Label>
+              <Select value={templateId} onValueChange={setTemplateId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a template" />
+                </SelectTrigger>
+                <SelectContent>
+                  {list.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                      {template.industry ? ` · ${template.industry}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex flex-col gap-1">
+                <Label>Group</Label>
+                {groups.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No groups yet. Create one on the Templates page.
+                  </p>
+                ) : groupId ? (
+                  <Select value={groupId} onValueChange={setGroupId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {groups.map((group) => (
+                        <SelectItem key={group.id} value={group.id}>
+                          {group.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : null}
+              </div>
+              {selectedGroup ? (
+                <ol className="space-y-1">
+                  {selectedGroup.items.map((item, index) => {
+                    const active = item.templateId === templateId;
+                    return (
+                      <li key={item.templateId}>
+                        <button
+                          type="button"
+                          onClick={() => setTemplateId(item.templateId)}
+                          className={cn(
+                            'flex w-full items-center gap-2 rounded-[var(--radius-sm)] border px-2.5 py-1.5 text-left text-sm',
+                            active ? 'border-primary bg-accent' : 'hover:bg-accent/60',
+                          )}
+                        >
+                          <span className="w-5 font-mono text-xs text-muted-foreground">{index + 1}</span>
+                          <span className="min-w-0 flex-1 truncate">
+                            {item.templateName}
+                            {item.industry ? (
+                              <span className="ml-2 text-xs text-muted-foreground">{item.industry}</span>
+                            ) : null}
+                          </span>
+                          {sentTemplateIds.has(item.templateId) ? <Badge tone="muted">sent</Badge> : null}
+                        </button>
+                      </li>
+                    );
+                  })}
+                  {selectedGroup.items.length === 0 ? (
+                    <li className="text-xs text-muted-foreground">This group has no templates.</li>
+                  ) : null}
+                </ol>
+              ) : null}
+            </div>
+          )}
+
+          {selectedTemplate?.industry &&
+          contact.companyIndustry &&
+          selectedTemplate.industry !== contact.companyIndustry ? (
+            <p className="text-xs text-warning">
+              This template is written for {selectedTemplate.industry}. This company is{' '}
+              {contact.companyIndustry}.
+            </p>
+          ) : null}
 
           {preview.isLoading ? (
             <p className="text-xs text-muted-foreground">Building preview…</p>

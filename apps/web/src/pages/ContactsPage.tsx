@@ -7,6 +7,7 @@ import { NewContactDialog } from '@/components/NewContactDialog';
 import { SendModal, ValidationBadge } from '@/components/SendModal';
 import { Button } from '@/components/ui/button';
 import { Card, EmptyState } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,6 +33,8 @@ const IMPORT_FIELDS: { value: string; label: string }[] = [
   { value: 'ignore', label: 'Ignore' },
   { value: 'email', label: 'Email' },
   { value: 'company', label: 'Company name' },
+  { value: 'website', label: 'Company website' },
+  { value: 'industry', label: 'Industry' },
   { value: 'first_name', label: 'First name' },
   { value: 'last_name', label: 'Last name' },
   { value: 'full_name', label: 'Full name' },
@@ -46,6 +49,7 @@ function ImportDialog() {
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [skipValidation, setSkipValidation] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const preview = usePreviewImport();
   const importer = useImportContacts();
@@ -59,6 +63,7 @@ function ImportDialog() {
     setFile(null);
     setHeaders([]);
     setMapping({});
+    setSkipValidation(false);
     preview.reset();
     importer.reset();
     if (fileInput.current) fileInput.current.value = '';
@@ -107,10 +112,27 @@ function ImportDialog() {
             }}
           />
           <p className="text-xs text-muted-foreground">
-            Every new address is validated on import. Invalid ones are suppressed automatically.
+            {skipValidation
+              ? 'Addresses we have not checked before are imported unvalidated. A previous result is reused.'
+              : 'Addresses we have not checked before are validated on import. A previous result is reused, and invalid ones are suppressed automatically.'}{' '}
             Record where each address came from in the <strong>source</strong> column — that is
-            your evidence for why contacting this person is defensible.
+            your evidence for why contacting this person is defensible. Website and industry are
+            stored on the company; the first non-blank value is kept.
           </p>
+          <label className="flex cursor-pointer items-start gap-2.5 text-xs">
+            <Checkbox
+              checked={skipValidation}
+              disabled={importer.isPending}
+              onCheckedChange={(checked) => setSkipValidation(checked === true)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">Skip email validation</span>
+              <span className="mt-0.5 block text-muted-foreground">
+                Don't check addresses we haven't seen before. An address already checked keeps that result.
+              </span>
+            </span>
+          </label>
 
           <ErrorBanner error={preview.error ?? importer.error} />
 
@@ -119,7 +141,7 @@ function ImportDialog() {
               <p className="text-xs font-medium">Map columns</p>
               <div className="max-h-64 space-y-2 overflow-y-auto rounded-[var(--radius-sm)] border p-2">
                 {headers.map((header) => (
-                  <div key={header} className="grid grid-cols-[1fr_10rem] items-center gap-2">
+                  <div key={header} className="grid grid-cols-[1fr_12.5rem] items-center gap-2">
                     <span className="truncate font-mono text-xs" title={header}>
                       {header || '(empty)'}
                     </span>
@@ -170,7 +192,10 @@ function ImportDialog() {
                 ) : null}
               </ul>
               <p className="text-muted-foreground">
-                Validator: {importer.data.validator}. Columns recognised:{' '}
+                {skipValidation
+                  ? 'Email validation was skipped for addresses not checked before.'
+                  : `Validator: ${importer.data.validator}.`}{' '}
+                Columns recognised:{' '}
                 {Object.entries(importer.data.headersRecognised)
                   .map(([header, field]) => `${header} → ${field}`)
                   .join(', ')}
@@ -199,7 +224,7 @@ function ImportDialog() {
                   headers.length === 0
                 }
                 onClick={() => {
-                  if (file) importer.mutate({ file, mapping });
+                  if (file) importer.mutate({ file, mapping, skipValidation });
                 }}
               >
                 {importer.isPending ? 'Importing…' : preview.isPending ? 'Reading…' : 'Import'}

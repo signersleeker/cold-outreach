@@ -139,6 +139,7 @@ def test_dns_failure_is_unknown_not_invalid() -> None:
 
     result = SyntaxMxValidator(Flaky()).validate("avery@northwind.example")
     assert result.status == "unknown"
+    assert result.durable is False
 
 
 def test_mixed_null_and_real_mx_is_valid() -> None:
@@ -215,15 +216,26 @@ def test_role_inbox_on_a_catch_all_domain_is_not_confirmed() -> None:
     assert result.status == "risky"
 
 
+def test_zerobounce_keeps_the_provider_payload() -> None:
+    payload = {"status": "valid", "sub_status": "", "free_email": False, "mx_record": "mx.example"}
+    result = zb(payload).validate("avery@northwind.example")
+    assert result.status == "valid"
+    assert result.durable is True
+    assert result.provider_status == "valid"
+    assert result.provider_payload == payload
+
+
 def test_zerobounce_error_field_yields_unknown() -> None:
     result = zb({"error": "Invalid API key"}).validate("avery@northwind.example")
     assert result.status == "unknown"
+    assert result.durable is False
     assert "Invalid API key" in result.detail
 
 
 def test_zerobounce_http_error_yields_unknown() -> None:
     result = zb({}, status_code=500).validate("avery@northwind.example")
     assert result.status == "unknown"
+    assert result.durable is False
 
 
 def test_zerobounce_transport_failure_yields_unknown() -> None:

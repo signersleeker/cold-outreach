@@ -1,0 +1,20 @@
+/** Keep in sync with apps/api/app/companies/constants.py */
+export const INDUSTRIES = [
+  'Information Technology',
+  'Telecommunications',
+  'Hardware & Electronics',
+  'Financial Services',
+  'Insurance',
+  'Professional Services',
+  'Healthcare Services',
+  'Pharmaceuticals & Biotechnology',
+  'Medical Devices',
+  'Retail Trade',
+  'Food & Beverage',
+  'Apparel & Cosmetics',
+  'Construction',
+  'Manufacturing',
+  'Logistics & Transportation',
+  'Mining & Metals',
+  'Utilities',
+] as const;

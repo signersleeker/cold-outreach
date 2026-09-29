@@ -50,6 +50,16 @@ HEADER_ALIASES: dict[str, str] = {
     "organization": "company",
     "account": "company",
     "employer": "company",
+    # company profile — stored on the company, not the contact
+    "website": "website",
+    "company_website": "website",
+    "website_url": "website",
+    "company_url": "website",
+    "domain": "website",
+    "homepage": "website",
+    "industry": "industry",
+    "sector": "industry",
+    "vertical": "industry",
     # title
     "title": "title",
     "job_title": "title",

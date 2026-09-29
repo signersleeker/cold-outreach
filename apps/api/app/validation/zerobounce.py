@@ -88,20 +88,24 @@ class ZeroBounceValidator:
                 params={"api_key": self._api_key, "email": email, "ip_address": ""},
             )
         except httpx.HTTPError as exc:
-            return ValidationResult.unknown(f"ZeroBounce request failed: {exc}.")
+            return ValidationResult.unknown(
+                f"ZeroBounce request failed: {exc}.", durable=False
+            )
 
         if response.status_code >= 400:
             return ValidationResult.unknown(
-                f"ZeroBounce returned HTTP {response.status_code}."
+                f"ZeroBounce returned HTTP {response.status_code}.", durable=False
             )
 
         try:
             payload = response.json()
         except ValueError:
-            return ValidationResult.unknown("ZeroBounce returned an unreadable response.")
+            return ValidationResult.unknown(
+                "ZeroBounce returned an unreadable response.", durable=False
+            )
 
         if error := payload.get("error"):
-            return ValidationResult.unknown(f"ZeroBounce error: {error}.")
+            return ValidationResult.unknown(f"ZeroBounce error: {error}.", durable=False)
 
         raw_status = str(payload.get("status") or "unknown").lower()
         sub_status = str(payload.get("sub_status") or "").lower()
@@ -110,4 +114,10 @@ class ZeroBounceValidator:
         detail = f"ZeroBounce: {raw_status}"
         if sub_status:
             detail += f" / {sub_status}"
-        return ValidationResult(status, detail + ".")  # type: ignore[arg-type]
+        return ValidationResult(  # type: ignore[arg-type]
+            status,
+            detail + ".",
+            provider_status=raw_status,
+            provider_sub_status=sub_status,
+            provider_payload=payload if isinstance(payload, dict) else None,
+        )

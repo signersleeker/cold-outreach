@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Query, Response, UploadFile
 
@@ -74,6 +75,10 @@ def _read_upload(content: bytes) -> None:
         )
 
 
+def _form_flag(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @router.post("/contacts/import/preview")
 async def preview_import(file: UploadFile = File(...)) -> Response:
     content = await file.read()
@@ -94,13 +99,19 @@ async def import_contacts(
     clock: ClockDep,
     file: UploadFile = File(...),
     mapping: str | None = Form(default=None),
+    skip_validation: Annotated[str, Form(alias="skipValidation")] = "false",
 ) -> Response:
     content = await file.read()
     _read_upload(content)
     try:
         column_map = parse_mapping_json(mapping)
         summary = service.import_csv(
-            db, content, validator=validator, clock=clock, column_map=column_map
+            db,
+            content,
+            validator=validator,
+            clock=clock,
+            column_map=column_map,
+            skip_validation=_form_flag(skip_validation),
         )
     except CsvFormatError as exc:
         raise AppError(400, str(exc)) from exc

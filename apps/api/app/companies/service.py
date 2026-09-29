@@ -6,8 +6,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.companies.company import Company
+from app.companies.constants import match_industry, require_industry
 from app.contacts.contact import Contact
 from app.lib.errors import AppError
+
+
+def _website(value: str) -> str:
+    return value.strip()[:500]
 
 
 def get(db: Session, company_id: uuid.UUID) -> Company | None:
@@ -28,6 +33,20 @@ def find_by_name(db: Session, name: str) -> Company | None:
     return db.scalar(select(Company).where(func.lower(Company.name) == stripped.lower()))
 
 
+def fill_blanks(company: Company, *, website: str = "", industry: str = "") -> None:
+    """Set website or industry only where the company does not already have one.
+
+    An unrecognised industry is ignored so a bad CSV cell does not fail the row.
+    """
+    site = _website(website)
+    if site and not company.website:
+        company.website = site
+    if not company.industry:
+        matched = match_industry(industry)
+        if matched:
+            company.industry = matched
+
+
 def find_or_create(db: Session, name: str) -> Company | None:
     """Return an existing company for this name, or create one.
 
@@ -46,7 +65,13 @@ def find_or_create(db: Session, name: str) -> Company | None:
     return company
 
 
-def create(db: Session, name: str) -> Company:
+def create(
+    db: Session,
+    name: str,
+    *,
+    website: str = "",
+    industry: str = "",
+) -> Company:
     """Create a company explicitly. Refuses a blank or duplicate name."""
     stripped = name.strip()
     if not stripped:
@@ -54,7 +79,38 @@ def create(db: Session, name: str) -> Company:
     existing = find_by_name(db, stripped)
     if existing is not None:
         raise AppError(409, f"{existing.name!r} already exists")
-    company = Company(name=stripped[:200])
+    company = Company(
+        name=stripped[:200],
+        website=_website(website),
+        industry=require_industry(industry),
+    )
+    db.add(company)
+    db.commit()
+    db.refresh(company)
+    return company
+
+
+def update(
+    db: Session,
+    company_id: uuid.UUID,
+    *,
+    name: str | None = None,
+    website: str | None = None,
+    industry: str | None = None,
+) -> Company:
+    company = require(db, company_id)
+    if name is not None:
+        stripped = name.strip()
+        if not stripped:
+            raise AppError(400, "a company name is required")
+        existing = find_by_name(db, stripped)
+        if existing is not None and existing.id != company.id:
+            raise AppError(409, f"{existing.name!r} already exists")
+        company.name = stripped[:200]
+    if website is not None:
+        company.website = _website(website)
+    if industry is not None:
+        company.industry = require_industry(industry)
     db.add(company)
     db.commit()
     db.refresh(company)

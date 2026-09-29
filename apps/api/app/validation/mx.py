@@ -85,7 +85,9 @@ class SyntaxMxValidator:
         except DomainNotFoundError:
             return ValidationResult.invalid(f"Domain {domain} does not exist.")
         except dns.exception.DNSException as exc:
-            return ValidationResult.unknown(f"DNS lookup for {domain} failed: {exc}.")
+            return ValidationResult.unknown(
+                f"DNS lookup for {domain} failed: {exc}.", durable=False
+            )
 
         if hosts:
             if all(host == NULL_MX for host in hosts):
@@ -109,6 +111,8 @@ class SyntaxMxValidator:
         except DomainNotFoundError:
             return ValidationResult.invalid(f"Domain {domain} does not exist.")
         except dns.exception.DNSException as exc:
-            return ValidationResult.unknown(f"DNS lookup for {domain} failed: {exc}.")
+            return ValidationResult.unknown(
+                f"DNS lookup for {domain} failed: {exc}.", durable=False
+            )
 
         return ValidationResult.invalid(f"{domain} has no MX or address record.")

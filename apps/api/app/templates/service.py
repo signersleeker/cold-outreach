@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.companies.constants import require_industry
 from app.lib.errors import AppError
 from app.templates.template import Template
 
@@ -24,10 +25,12 @@ def require(db: Session, template_id: uuid.UUID) -> Template:
     return template
 
 
-def create(db: Session, *, name: str, subject: str, body: str) -> Template:
+def create(
+    db: Session, *, name: str, subject: str, body: str, industry: str = ""
+) -> Template:
     if db.scalar(select(Template).where(Template.name == name)):
         raise AppError(409, f"a template named {name!r} already exists")
-    template = Template(name=name, subject=subject, body=body)
+    template = Template(name=name, subject=subject, body=body, industry=require_industry(industry))
     db.add(template)
     db.commit()
     db.refresh(template)
@@ -41,6 +44,7 @@ def update(
     name: str | None = None,
     subject: str | None = None,
     body: str | None = None,
+    industry: str | None = None,
 ) -> Template:
     template = require(db, template_id)
     if name is not None and name != template.name:
@@ -51,6 +55,8 @@ def update(
         template.subject = subject
     if body is not None:
         template.body = body
+    if industry is not None:
+        template.industry = require_industry(industry)
     db.add(template)
     db.commit()
     db.refresh(template)

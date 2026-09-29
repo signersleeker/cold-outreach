@@ -1,18 +1,19 @@
 import { Ban, Send } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ErrorBanner, PageHeader } from '@/components/AppLayout';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
+import { IndustrySelect } from '@/components/IndustrySelect';
 import { NewContactDialog } from '@/components/NewContactDialog';
 import { SendModal, ValidationBadge } from '@/components/SendModal';
 import { Button } from '@/components/ui/button';
-import { Card, EmptyState } from '@/components/ui/card';
+import { Card, CardBody, CardHeader, CardTitle, EmptyState } from '@/components/ui/card';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
-import { useCompany, useContacts, useSuppressContact } from '@/hooks';
+import { useCompany, useContacts, useSuppressContact, useUpdateCompany } from '@/hooks';
 import type { Contact } from '@/lib/api';
-import { formatRelative, fullName } from '@/lib/format';
+import { formatRelative, fullName, websiteHref } from '@/lib/format';
 
 const PAGE_SIZE = 50;
 
@@ -71,6 +72,8 @@ export function CompanyDetailPage() {
   const [offset, setOffset] = useState(0);
   const [sendTo, setSendTo] = useState<Contact | null>(null);
   const [suppressTarget, setSuppressTarget] = useState<Contact | null>(null);
+  const [profile, setProfile] = useState({ name: '', website: '', industry: '' });
+  const updateCompany = useUpdateCompany();
 
   const companyQuery = useCompany(id);
   const contactsQuery = useContacts({
@@ -81,6 +84,15 @@ export function CompanyDetailPage() {
 
   const company = companyQuery.data;
   const contacts = contactsQuery.data?.data ?? [];
+
+  useEffect(() => {
+    if (!company) return;
+    setProfile({
+      name: company.name,
+      website: company.website,
+      industry: company.industry,
+    });
+  }, [company]);
   const total = contactsQuery.data?.meta.total ?? 0;
   const error = companyQuery.error ?? contactsQuery.error;
 
@@ -102,7 +114,9 @@ export function CompanyDetailPage() {
         title={company?.name ?? 'Company'}
         description={
           company
-            ? `${total} contact${total === 1 ? '' : 's'} · from Companies`
+            ? [company.industry, `${total} contact${total === 1 ? '' : 's'}`]
+                .filter(Boolean)
+                .join(' · ')
             : 'Loading company…'
         }
         actions={
@@ -117,6 +131,72 @@ export function CompanyDetailPage() {
 
       <div className="space-y-3 px-6 py-4">
       <ErrorBanner error={error} />
+
+      {company ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Details</CardTitle>
+            <Button
+              size="sm"
+              disabled={
+                updateCompany.isPending ||
+                !profile.name.trim() ||
+                (profile.name === company.name &&
+                  profile.website === company.website &&
+                  profile.industry === company.industry)
+              }
+              onClick={() =>
+                updateCompany.mutate({
+                  id: company.id,
+                  name: profile.name.trim(),
+                  website: profile.website.trim(),
+                  industry: profile.industry,
+                })
+              }
+            >
+              {updateCompany.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </CardHeader>
+          <CardBody className="grid gap-3 sm:grid-cols-2">
+            <Field label="Name">
+              <Input
+                maxLength={200}
+                value={profile.name}
+                onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))}
+              />
+            </Field>
+            <Field label="Industry">
+              <IndustrySelect
+                value={profile.industry}
+                onValueChange={(industry) => setProfile((current) => ({ ...current, industry }))}
+              />
+            </Field>
+            <Field label="Website" className="sm:col-span-2">
+              <Input
+                maxLength={500}
+                placeholder="https://example.com"
+                value={profile.website}
+                onChange={(event) =>
+                  setProfile((current) => ({ ...current, website: event.target.value }))
+                }
+              />
+              {profile.website.trim() ? (
+                <a
+                  href={websiteHref(profile.website)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-muted-foreground hover:underline"
+                >
+                  Open website
+                </a>
+              ) : null}
+            </Field>
+            <div className="sm:col-span-2">
+              <ErrorBanner error={updateCompany.error} />
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
 
       <Card className="overflow-hidden">
         {companyQuery.isLoading || contactsQuery.isLoading ? (

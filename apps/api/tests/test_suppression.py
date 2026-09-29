@@ -217,6 +217,47 @@ def test_import_skips_duplicates_against_existing_contacts(
     assert summary.skipped_dupes == 1
 
 
+def test_import_can_skip_email_validation(db: Session, validator, clock) -> None:
+    validator.by_email = {
+        "bad@nowhere.invalid": ValidationResult.invalid("no MX record"),
+    }
+    summary = contacts_service.import_csv(
+        db,
+        b"Email\nbad@nowhere.invalid\n",
+        validator=validator,
+        clock=clock,
+        skip_validation=True,
+    )
+    assert validator.calls == []
+    assert summary.created == 1
+    assert summary.pending == 1
+    assert summary.invalid == 0
+    contact = contacts_service.by_email(db, "bad@nowhere.invalid")
+    assert contact is not None
+    assert contact.validation_status == "pending"
+    assert contact.suppressed is False
+    assert suppressions_service.is_suppressed(db, "bad@nowhere.invalid") is None
+
+
+def test_import_endpoint_honours_skip_validation(client, db: Session, validator) -> None:
+    validator.by_email = {
+        "bad@nowhere.invalid": ValidationResult.invalid("no MX record"),
+    }
+    response = client.post(
+        "/api/v1/contacts/import",
+        files={"file": ("prospects.csv", b"Email\nbad@nowhere.invalid\n", "text/csv")},
+        data={"skipValidation": "true"},
+    )
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["created"] == 1
+    assert body["pending"] == 1
+    assert body["invalid"] == 0
+    assert validator.calls == []
+    contact = contacts_service.by_email(db, "bad@nowhere.invalid")
+    assert contact is not None and contact.validation_status == "pending"
+
+
 def test_validation_failure_leaves_the_row_pending(db: Session, validator, clock) -> None:
     class Exploding:
         name = "exploding"

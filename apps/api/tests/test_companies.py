@@ -101,6 +101,49 @@ def test_search_companies_and_filter_contacts(db: Session, make_contact) -> None
     assert contacts[0].email == "a@northwind.example"
 
 
+def test_create_and_update_website_and_industry(db: Session) -> None:
+    import pytest
+
+    from app.lib.errors import AppError
+
+    company = companies_service.create(
+        db, "Northwind", website=" https://northwind.example ", industry="insurance"
+    )
+    assert company.website == "https://northwind.example"
+    assert company.industry == "Insurance"
+
+    updated = companies_service.update(db, company.id, industry="Mining & Metals", website="")
+    assert updated.industry == "Mining & Metals"
+    assert updated.website == ""
+
+    with pytest.raises(AppError) as unknown:
+        companies_service.create(db, "Acme", industry="Space Mining")
+    assert unknown.value.status_code == 400
+
+
+def test_import_sets_website_and_industry(db: Session, validator, clock) -> None:
+    csv = (
+        "Email,Company,Website,Industry\n"
+        "a@northwind.example,Northwind,,\n"
+        "b@northwind.example,Northwind, https://northwind.example ,insurance\n"
+        "c@acme.example,Acme,acme.example,Not A Real Industry\n"
+    )
+    summary = contacts_service.import_csv(db, csv.encode(), validator=validator, clock=clock)
+    assert summary.created == 3
+
+    northwind = companies_service.find_by_name(db, "Northwind")
+    acme = companies_service.find_by_name(db, "Acme")
+    assert northwind is not None and acme is not None
+    assert northwind.website == "https://northwind.example"
+    assert northwind.industry == "Insurance"
+    assert acme.website == "acme.example"
+    assert acme.industry == ""
+
+    contact = contacts_service.by_email(db, "a@northwind.example")
+    assert contact is not None
+    assert contact.company_industry == "Insurance"
+
+
 def test_update_company_name_reassigns(db: Session, make_contact) -> None:
     contact = make_contact(email="a@example.com", company="Northwind")
     first_id = contact.company_id

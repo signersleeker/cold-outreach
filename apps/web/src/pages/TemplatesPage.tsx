@@ -1,6 +1,8 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ErrorBanner, PageHeader } from '@/components/AppLayout';
+import { IndustrySelect } from '@/components/IndustrySelect';
+import { TemplateGroupsPanel } from '@/components/TemplateGroupsPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,13 +22,14 @@ const MERGE_VARS = [
   'company_legal',
 ];
 
-const BLANK = { name: '', subject: '', body: '' };
+const BLANK = { name: '', subject: '', body: '', industry: '' };
 
 export function TemplatesPage() {
   const { data, isLoading } = useTemplates();
   const { create, update, remove } = useTemplateMutations();
   const templates = data?.data ?? [];
 
+  const [section, setSection] = useState<'templates' | 'groups'>('templates');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState(BLANK);
 
@@ -40,7 +43,12 @@ export function TemplatesPage() {
   useEffect(() => {
     if (creating) setDraft(BLANK);
     else if (selected) {
-      setDraft({ name: selected.name, subject: selected.subject, body: selected.body });
+      setDraft({
+        name: selected.name,
+        subject: selected.subject,
+        body: selected.body,
+        industry: selected.industry,
+      });
     }
   }, [selectedId, selected?.updatedAt]);
 
@@ -49,7 +57,8 @@ export function TemplatesPage() {
     (selected !== null &&
       (draft.name !== selected.name ||
         draft.subject !== selected.subject ||
-        draft.body !== selected.body));
+        draft.body !== selected.body ||
+        draft.industry !== selected.industry));
 
   const referenced = [...draft.subject.matchAll(/\{\{\s*(\w+)\s*\}\}/g), ...draft.body.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map(
     (m) => m[1],
@@ -60,14 +69,42 @@ export function TemplatesPage() {
     <>
       <PageHeader
         title="Templates"
-        description="Plain text only. Every template must end with a human opt-out sentence, not a marketing footer."
+        description={
+          section === 'templates'
+            ? 'Plain text only. Tag a template with an industry when it is written for that kind of company.'
+            : 'A group is an ordered list of templates. Sending still happens one template at a time.'
+        }
         actions={
-          <Button variant="outline" onClick={() => setSelectedId('new')}>
-            <Plus />
-            New template
-          </Button>
+          <>
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant={section === 'templates' ? 'default' : 'outline'}
+                onClick={() => setSection('templates')}
+              >
+                Templates
+              </Button>
+              <Button
+                size="sm"
+                variant={section === 'groups' ? 'default' : 'outline'}
+                onClick={() => setSection('groups')}
+              >
+                Groups
+              </Button>
+            </div>
+            {section === 'templates' ? (
+              <Button variant="outline" onClick={() => setSelectedId('new')}>
+                <Plus />
+                New template
+              </Button>
+            ) : null}
+          </>
         }
       />
+
+      {section === 'groups' ? <TemplateGroupsPanel /> : null}
+
+      {section === 'templates' ? (
 
       <div className="grid gap-4 px-6 py-4 lg:grid-cols-[14rem_1fr]">
         <Card className="h-fit overflow-hidden">
@@ -85,11 +122,18 @@ export function TemplatesPage() {
                       selectedId === template.id ? 'bg-accent font-medium' : 'hover:bg-accent/60',
                     )}
                   >
-                    {template.name}
-                    {template.unknownVars.length > 0 ? (
-                      <Badge tone="warning" className="ml-1.5">
-                        !
-                      </Badge>
+                    <span>
+                      {template.name}
+                      {template.unknownVars.length > 0 ? (
+                        <Badge tone="warning" className="ml-1.5">
+                          !
+                        </Badge>
+                      ) : null}
+                    </span>
+                    {template.industry ? (
+                      <span className="block truncate text-xs font-normal text-muted-foreground">
+                        {template.industry}
+                      </span>
                     ) : null}
                   </button>
                 </li>
@@ -142,6 +186,12 @@ export function TemplatesPage() {
                   onChange={(event) => setDraft((d) => ({ ...d, name: event.target.value }))}
                 />
               </Field>
+              <Field label="Industry" hint="Leave unset when the template is not written for one industry.">
+                <IndustrySelect
+                  value={draft.industry}
+                  onValueChange={(industry) => setDraft((d) => ({ ...d, industry }))}
+                />
+              </Field>
               <Field
                 label="Subject"
                 hint="Avoid merge tags here — a blank field would block every send using this template."
@@ -184,6 +234,7 @@ export function TemplatesPage() {
           </Card>
         ) : null}
       </div>
+      ) : null}
     </>
   );
 }

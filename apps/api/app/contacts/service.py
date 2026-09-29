@@ -32,6 +32,10 @@ from app.suppressions import service as suppressions_service
 from app.suppressions.constants import REASON_MANUAL
 from app.suppressions.suppression import Suppression
 from app.validation.base import EmailValidator, ValidationResult
+from app.validation.email_validation import EmailValidation
+from app.validation.email_validation import by_emails as validations_by_email
+from app.validation.email_validation import get as validation_for_email
+from app.validation.email_validation import upsert as upsert_validation
 
 _UNSUB_TOKEN_BYTES = 32
 
@@ -210,6 +214,9 @@ def delete(db: Session, contact_id: uuid.UUID, *, force: bool = False) -> dict[s
     own table, so deleting a contact who opted out does not resurrect them: a
     later re-import recreates the contact already suppressed. Nothing in this app
     may turn a delete into a way to undo an opt-out.
+
+    email_validations is likewise left in place. A re-import copies that verdict
+    onto the new contact instead of calling the validator again.
     """
     contact = require(db, contact_id)
     sends = send_event_count(db, contact_id)
@@ -234,22 +241,60 @@ def delete(db: Session, contact_id: uuid.UUID, *, force: bool = False) -> dict[s
     }
 
 
+def _tally(summary: ImportSummary, status: str) -> None:
+    if status == VALIDATION_INVALID:
+        summary.invalid += 1
+    elif status == VALIDATION_RISKY:
+        summary.risky += 1
+    elif status == VALIDATION_VALID:
+        summary.valid += 1
+    else:
+        summary.pending += 1
+
+
+def _suppress_if_invalid(db: Session, contact: Contact, *, detail: str, now: dt.datetime) -> None:
+    if contact.validation_status != VALIDATION_INVALID:
+        return
+    suppressions_service.suppress(
+        db,
+        contact.email,
+        reason=REASON_MANUAL,
+        source=f"auto: validation ({detail})"[:200],
+        now=now,
+    )
+
+
+def apply_stored(db: Session, contact: Contact, record: EmailValidation) -> None:
+    """Copy a previous verdict onto a contact without calling the validator."""
+    contact.validation_status = record.status
+    contact.validation_detail = record.detail
+    contact.validated_at = record.validated_at
+    db.add(contact)
+    _suppress_if_invalid(db, contact, detail=record.detail, now=record.validated_at)
+
+
 def apply_validation(
-    db: Session, contact: Contact, outcome: ValidationResult, *, now: dt.datetime
+    db: Session,
+    contact: Contact,
+    outcome: ValidationResult,
+    *,
+    now: dt.datetime,
+    validator_name: str,
 ) -> None:
-    """Record a validation verdict, auto-suppressing invalid addresses."""
+    """Record a validation verdict, auto-suppressing invalid addresses.
+
+    A finished check is also stored by email. A transport failure updates this
+    contact only, so the next import can try the checker again.
+    """
     contact.validation_status = outcome.status
     contact.validation_detail = outcome.detail
     contact.validated_at = now
     db.add(contact)
-    if outcome.status == VALIDATION_INVALID:
-        suppressions_service.suppress(
-            db,
-            contact.email,
-            reason=REASON_MANUAL,
-            source=f"auto: validation ({outcome.detail})"[:200],
-            now=now,
+    if outcome.durable:
+        upsert_validation(
+            db, contact.email, outcome, validator_name=validator_name, now=now
         )
+    _suppress_if_invalid(db, contact, detail=outcome.detail, now=now)
 
 
 def revalidate(
@@ -257,7 +302,13 @@ def revalidate(
 ) -> Contact:
     contact = require(db, contact_id)
     outcome = validator.validate(contact.email)
-    apply_validation(db, contact, outcome, now=clock.now())
+    apply_validation(
+        db,
+        contact,
+        outcome,
+        now=clock.now(),
+        validator_name=getattr(validator, "name", "unknown"),
+    )
     # A shared inbox used to be stored as invalid and auto-suppressed. Once a
     # later check says the mailbox exists, that automatic suppression is a
     # mistake. An opt-out, bounce, or complaint is left in place.
@@ -292,7 +343,17 @@ def create(
     _assign_unsub_token(db, contact)
     db.add(contact)
     db.flush()
-    apply_validation(db, contact, validator.validate(normalized), now=clock.now())
+    stored = validation_for_email(db, normalized)
+    if stored is not None:
+        apply_stored(db, contact, stored)
+    else:
+        apply_validation(
+            db,
+            contact,
+            validator.validate(normalized),
+            now=clock.now(),
+            validator_name=getattr(validator, "name", "unknown"),
+        )
     db.commit()
     return require(db, contact.id)
 
@@ -304,13 +365,21 @@ def import_csv(
     validator: EmailValidator,
     clock: Clock,
     column_map: dict[str, str] | None = None,
+    skip_validation: bool = False,
 ) -> ImportSummary:
-    """Import a CSV, validating every new address inline.
+    """Import a CSV, reusing a stored verdict and validating the rest inline.
 
-    Validation is network-bound, so it runs on a small thread pool under a
-    wall-clock budget. Rows the budget does not reach stay `pending` and can be
-    validated later from the contact page — far better than a request that times
-    out after importing nothing.
+    An address already in email_validations is copied onto the new contact and
+    is not sent to the checker again, whether or not ``skip_validation`` is set.
+    An invalid stored verdict still auto-suppresses.
+
+    Validation of an address we have not seen is network-bound, so it runs on a
+    small thread pool under a wall-clock budget. Rows the budget does not reach
+    stay `pending` and can be validated later from the contact page.
+
+    When ``skip_validation`` is set, an address with no stored verdict stays
+    `pending` and nothing is written to email_validations. An address already
+    on the suppression list stays suppressed either way.
 
     When ``column_map`` is provided it maps header text -> field name and is
     used instead of automatic alias matching.
@@ -375,19 +444,39 @@ def import_csv(
             source=row.source,
         )
         _assign_company(db, contact, row.company)
+        if contact.company_ref is not None:
+            companies_service.fill_blanks(
+                contact.company_ref, website=row.website, industry=row.industry
+            )
         _assign_unsub_token(db, contact)
         db.add(contact)
         created.append(contact)
     db.flush()
     summary.created = len(created)
 
+    stored = validations_by_email(db, [contact.email for contact in created])
+    validator_name = getattr(validator, "name", "unknown")
+    needs_check: list[Contact] = []
+    for contact in created:
+        record = stored.get(contact.email)
+        if record is not None:
+            apply_stored(db, contact, record)
+            _tally(summary, record.status)
+            continue
+        if skip_validation:
+            summary.pending += 1
+            continue
+        needs_check.append(contact)
+
     # Network calls only — no Session touches a worker thread.
     outcomes: dict[str, ValidationResult] = {}
-    if created:
+    if needs_check:
         deadline = monotonic() + IMPORT_VALIDATION_BUDGET_SECONDS
-        emails = [c.email for c in created]
         with ThreadPoolExecutor(max_workers=IMPORT_VALIDATION_WORKERS) as pool:
-            futures = {pool.submit(validator.validate, email): email for email in emails}
+            futures = {
+                pool.submit(validator.validate, contact.email): contact.email
+                for contact in needs_check
+            }
             for future, email in futures.items():
                 remaining = deadline - monotonic()
                 if remaining <= 0:
@@ -398,20 +487,15 @@ def import_csv(
                 except Exception:  # noqa: BLE001 - a failed check must stay pending
                     continue
 
-    for contact in created:
+    for contact in needs_check:
         outcome = outcomes.get(contact.email)
         if outcome is None:
             summary.pending += 1
             continue
-        apply_validation(db, contact, outcome, now=now)
-        if outcome.status == VALIDATION_INVALID:
-            summary.invalid += 1
-        elif outcome.status == VALIDATION_RISKY:
-            summary.risky += 1
-        elif outcome.status == VALIDATION_VALID:
-            summary.valid += 1
-        else:
-            summary.pending += 1
+        apply_validation(
+            db, contact, outcome, now=now, validator_name=validator_name
+        )
+        _tally(summary, outcome.status)
 
     for contact in created:
         if contact.email in already_suppressed:

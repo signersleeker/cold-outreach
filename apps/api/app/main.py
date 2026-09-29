@@ -27,6 +27,7 @@ from app.lib.response import error_body
 from app.sends.router import router as sends_router
 from app.sends.services.send import SendService
 from app.suppressions.router import router as suppressions_router
+from app.templates.groups_router import router as template_groups_router
 from app.templates.router import router as templates_router
 from app.unsub.router import router as unsub_router
 from app.validation.factory import build_validator
@@ -40,6 +41,7 @@ _API_ROUTERS = (
     contacts_router,
     companies_router,
     templates_router,
+    template_groups_router,
     sends_router,
     suppressions_router,
     settings_router,

@@ -7,7 +7,7 @@ import { Card, EmptyState } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
 import { useCompanies } from '@/hooks';
-import { formatRelative, plural } from '@/lib/format';
+import { formatRelative, plural, websiteHref } from '@/lib/format';
 
 const PAGE_SIZE = 50;
 
@@ -65,6 +65,8 @@ export function CompaniesPage() {
               <thead>
                 <tr>
                   <Th>Name</Th>
+                  <Th>Industry</Th>
+                  <Th>Website</Th>
                   <Th>Contacts</Th>
                   <Th>Created</Th>
                 </tr>
@@ -79,6 +81,21 @@ export function CompaniesPage() {
                       >
                         {company.name}
                       </Link>
+                    </Td>
+                    <Td>{company.industry || '—'}</Td>
+                    <Td className="max-w-48 truncate text-xs">
+                      {company.website ? (
+                        <a
+                          href={websiteHref(company.website)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline"
+                        >
+                          {company.website}
+                        </a>
+                      ) : (
+                        '—'
+                      )}
                     </Td>
                     <Td className="font-mono text-xs">
                       {plural(company.contactCount, 'contact')}

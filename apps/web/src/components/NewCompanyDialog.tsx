@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateCompany } from '@/hooks';
 import { ErrorBanner } from './AppLayout';
+import { IndustrySelect } from './IndustrySelect';
 import { Button } from './ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from './ui/dialog';
 import { Field, Input } from './ui/input';
@@ -10,6 +11,8 @@ import { Field, Input } from './ui/input';
 export function NewCompanyDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
+  const [website, setWebsite] = useState('');
+  const [industry, setIndustry] = useState('');
   const create = useCreateCompany();
   const navigate = useNavigate();
 
@@ -17,6 +20,8 @@ export function NewCompanyDialog() {
     setOpen(next);
     if (next) {
       setName('');
+      setWebsite('');
+      setIndustry('');
       create.reset();
     }
   }
@@ -37,24 +42,40 @@ export function NewCompanyDialog() {
             id="new-company"
             onSubmit={(event) => {
               event.preventDefault();
-              create.mutate(name.trim(), {
-                onSuccess: (company) => {
-                  setOpen(false);
-                  navigate(`/companies/${company.id}`);
+              create.mutate(
+                { name: name.trim(), website: website.trim(), industry },
+                {
+                  onSuccess: (company) => {
+                    setOpen(false);
+                    navigate(`/companies/${company.id}`);
+                  },
                 },
-              });
+              );
             }}
           >
-            <Field label="Company name *">
-              <Input
-                autoFocus
-                required
-                maxLength={200}
-                placeholder="Northwind Mutual"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </Field>
+            <div className="space-y-3">
+              <Field label="Company name *">
+                <Input
+                  autoFocus
+                  required
+                  maxLength={200}
+                  placeholder="Northwind Mutual"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </Field>
+              <Field label="Website">
+                <Input
+                  maxLength={500}
+                  placeholder="https://northwind.example"
+                  value={website}
+                  onChange={(event) => setWebsite(event.target.value)}
+                />
+              </Field>
+              <Field label="Industry">
+                <IndustrySelect value={industry} onValueChange={setIndustry} />
+              </Field>
+            </div>
           </form>
           <ErrorBanner error={create.error} />
         </DialogBody>

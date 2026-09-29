@@ -118,6 +118,21 @@ def test_blank_company_cell_yields_empty_company() -> None:
     assert result.rows[1].company == "Northwind"
 
 
+def test_website_and_industry_columns_are_mapped() -> None:
+    result = parse(
+        "Email,Company,Website,Industry\n"
+        "a@example.com,Northwind,https://northwind.example,Insurance\n"
+    )
+    row = result.rows[0]
+    assert row.website == "https://northwind.example"
+    assert row.industry == "Insurance"
+    assert build_column_map(["Email", "Company Website", "Sector"]) == {
+        "email": 0,
+        "website": 1,
+        "industry": 2,
+    }
+
+
 def test_preview_suggests_aliases() -> None:
     preview = preview_csv(b"Work Email,Company Name,Lead Score\n")
     assert preview.headers == ["Work Email", "Company Name", "Lead Score"]

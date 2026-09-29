@@ -72,3 +72,7 @@ class Contact(Base):
     def company(self) -> str:
         """Company name for merge tags, DTOs, and the send gate."""
         return self.company_ref.name if self.company_ref is not None else ""
+
+    @property
+    def company_industry(self) -> str:
+        return self.company_ref.industry if self.company_ref is not None else ""

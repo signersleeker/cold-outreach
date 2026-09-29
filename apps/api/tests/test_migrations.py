@@ -19,16 +19,16 @@ def test_upgrade_is_idempotent(engine: Engine) -> None:
 def test_status_lists_every_migration(engine: Engine) -> None:
     rows = status(engine)
     versions = [v for v, _, _ in rows]
-    assert versions == ["0001", "0002", "0003"]
+    assert versions == ["0001", "0002", "0003", "0004", "0005"]
     assert all(applied for _, _, applied in rows)
 
 
-def test_downgrade_one_step_removes_companies(engine: Engine) -> None:
+def test_downgrade_past_companies_removes_the_table(engine: Engine) -> None:
     upgrade(engine)
     assert "companies" in inspect(engine).get_table_names()
 
-    rolled = downgrade(engine, steps=1)
-    assert rolled == ["0003"]
+    rolled = downgrade(engine, steps=3)
+    assert rolled == ["0005", "0004", "0003"]
     assert "companies" not in inspect(engine).get_table_names()
     assert "company" in {c["name"] for c in inspect(engine).get_columns("contacts")}
 
@@ -67,7 +67,7 @@ def test_initial_up_skips_existing_tables(engine: Engine) -> None:
 def test_companies_migration_backfills_existing_names(engine: Engine) -> None:
     """Downgrade past companies, seed a string company, upgrade and check the FK."""
     upgrade(engine)
-    downgrade(engine, steps=1)
+    downgrade(engine, steps=3)
     assert "company" in {c["name"] for c in inspect(engine).get_columns("contacts")}
 
     with engine.begin() as conn:
@@ -116,7 +116,53 @@ def test_full_downgrade_and_upgrade_round_trip(engine: Engine) -> None:
     assert "contacts" not in inspector.get_table_names()
 
     applied = upgrade(engine)
-    assert applied == ["0001", "0002", "0003"]
+    assert applied == ["0001", "0002", "0003", "0004", "0005"]
+    assert "email_validations" in inspect(engine).get_table_names()
     assert "settings" in inspect(engine).get_table_names()
     assert "companies" in inspect(engine).get_table_names()
     assert "include_unsub_link" in {c["name"] for c in inspect(engine).get_columns("settings")}
+    assert "website" in {c["name"] for c in inspect(engine).get_columns("companies")}
+    assert "template_groups" in inspect(engine).get_table_names()
+
+
+def test_email_validation_migration_backfills_checked_contacts(engine: Engine) -> None:
+    upgrade(engine)
+    downgrade(engine, steps=1)
+    assert "email_validations" not in inspect(engine).get_table_names()
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO contacts "
+                "(email, unsub_token, validation_status, validation_detail, validated_at) "
+                "VALUES "
+                "('kept@northwind.example', 'tok-kept-m0005', 'valid', 'has MX', "
+                "'2026-03-02T00:00:00Z'), "
+                "('fresh@northwind.example', 'tok-fresh-m0005', 'pending', '', NULL)"
+            )
+        )
+    try:
+        upgrade(engine)
+        with engine.begin() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT email, status, detail FROM email_validations "
+                    "WHERE email IN ('kept@northwind.example', 'fresh@northwind.example') "
+                    "ORDER BY email"
+                )
+            ).fetchall()
+        assert rows == [("kept@northwind.example", "valid", "has MX")]
+    finally:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "DELETE FROM email_validations WHERE email IN "
+                    "('kept@northwind.example', 'fresh@northwind.example')"
+                )
+            )
+            conn.execute(
+                text(
+                    "DELETE FROM contacts WHERE email IN "
+                    "('kept@northwind.example', 'fresh@northwind.example')"
+                )
+            )

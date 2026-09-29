@@ -22,6 +22,7 @@ export const queryKeys = {
   companies: (params: CompaniesQuery) => ['companies', params] as const,
   company: (id: string) => ['companies', id] as const,
   templates: ['templates'] as const,
+  templateGroups: ['template-groups'] as const,
   sendPreview: (contactId: string, templateId: string, acknowledge: string[]) =>
     ['send-preview', contactId, templateId, [...acknowledge].sort()] as const,
   sendHistory: (contactId?: string) => ['sends', contactId ?? 'all'] as const,

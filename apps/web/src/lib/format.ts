@@ -55,3 +55,9 @@ export function plural(count: number, singular: string, plural?: string): string
 export function fullName(contact: { firstName: string; lastName: string }): string {
   return [contact.firstName, contact.lastName].filter(Boolean).join(' ');
 }
+
+export function websiteHref(value: string): string {
+  const trimmed = value.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
