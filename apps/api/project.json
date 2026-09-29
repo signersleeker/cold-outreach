@@ -26,6 +26,27 @@
         "cwd": "{projectRoot}"
       }
     },
+    "migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "sh -c 'PATH=\"$PWD/.venv/bin:$PATH\" exec python -m app.cli.migrate up'",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "migrate-down": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "sh -c 'PATH=\"$PWD/.venv/bin:$PATH\" exec python -m app.cli.migrate down'",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "migrate-status": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "sh -c 'PATH=\"$PWD/.venv/bin:$PATH\" exec python -m app.cli.migrate status'",
+        "cwd": "{projectRoot}"
+      }
+    },
     "reconcile": {
       "executor": "nx:run-commands",
       "options": {

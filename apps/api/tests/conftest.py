@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.constants import SESSION_COOKIE_NAME
 from app.contacts.contact import Contact
 from app.contacts.service import new_unsub_token
-from app.database import Base, get_db, import_all_models, reset_engine
+from app.database import get_db, import_all_models, reset_engine
 from app.gmail.constants import CONN_CONNECTED, GMAIL_SCOPES
 from app.gmail.oauth_token import OAuthToken
 from app.lib import crypto
@@ -60,7 +60,9 @@ def engine(settings):
             "and copy .env.test.example to .env.test"
         )
     import_all_models()
-    Base.metadata.create_all(eng)
+    from app.migrations.runner import upgrade
+
+    upgrade(eng)
     yield eng
     eng.dispose()
 
@@ -137,6 +139,7 @@ def app_settings(db: Session) -> AppSetting:
     row.company_legal = "Kinnatic Pty Ltd"
     row.from_email = "joey@kinnatic.ai"
     row.daily_cap = 20
+    row.include_unsub_link = True
     db.add(row)
     db.commit()
     return row

@@ -23,6 +23,8 @@ class SendPreviewRequest(CamelModel):
 class SendPreviewDTO(CamelModel):
     subject: str
     body: str
+    body_html: str
+    signature_html: str
     unsub_url: str
     from_email: str
     sends_today: int

@@ -35,7 +35,7 @@ from app.config import Settings
 from app.contacts.contact import Contact
 from app.gmail.client import GmailClient
 from app.gmail.exceptions import GmailAmbiguousError, GmailPermanentError
-from app.gmail.mime import build_plain_text_message, encode_raw, new_message_id
+from app.gmail.mime import build_outbound_message, encode_raw, new_message_id
 from app.gmail.oauth_service import GmailOAuthService
 from app.lib.clock import Clock, brisbane_date
 from app.lib.errors import AppError
@@ -54,6 +54,8 @@ from app.sends.services.gate_input import collect
 class SendPreview:
     subject: str
     body: str
+    body_html: str
+    signature_html: str
     unsub_url: str
     from_email: str
     sends_today: int
@@ -94,6 +96,13 @@ class SendService:
         if contact is None:
             raise AppError(404, "contact not found")
 
+        gmail_client = None
+        if self._client_factory is not None or self.oauth.is_connected(db):
+            try:
+                gmail_client = self._client(db)
+            except RuntimeError:
+                gmail_client = None
+
         collected = collect(
             db,
             contact=contact,
@@ -102,10 +111,13 @@ class SendService:
             oauth=self.oauth,
             clock=self.clock,
             acknowledge=acknowledge,
+            client=gmail_client,
         )
         return SendPreview(
             subject=collected.subject,
             body=collected.final_body,
+            body_html=collected.body_html,
+            signature_html=collected.signature_html,
             unsub_url=collected.unsub_url,
             from_email=collected.from_email,
             sends_today=collected.gate_input.sends_today,
@@ -132,6 +144,7 @@ class SendService:
             db.rollback()
             raise AppError(404, "contact not found")
 
+        gmail_client = self._client(db)
         collected = collect(
             db,
             contact=contact,
@@ -140,6 +153,7 @@ class SendService:
             oauth=self.oauth,
             clock=self.clock,
             acknowledge=acknowledge,
+            client=gmail_client,
         )
         result = evaluate_gates(collected.gate_input)
         if not result.ok:
@@ -171,20 +185,21 @@ class SendService:
         db.refresh(event)
 
         # ------------------------- the side effect ---------------------------
-        message = build_plain_text_message(
+        message = build_outbound_message(
             to_email=contact.email,
             to_name=collected.to_name,
             from_email=collected.from_email,
             sender_name=collected.sender_name,
             reply_to=collected.from_email,
             subject=collected.subject,
-            body=collected.final_body,
+            body_plain=collected.final_body,
+            body_html=collected.body_html,
             rfc822_message_id=rfc822_id,
             now=now,
         )
 
         try:
-            gmail_message_id = self._client(db).send(encode_raw(message))
+            gmail_message_id = gmail_client.send(encode_raw(message))
         except GmailPermanentError as exc:
             # Gmail rejected it outright, so it was never queued: give the slot
             # back and undo the cooldown stamp.

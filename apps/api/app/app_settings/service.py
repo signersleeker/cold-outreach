@@ -23,6 +23,7 @@ def get_or_create(db: Session) -> AppSetting:
         sender_title=DEFAULT_SENDER_TITLE,
         company_legal=DEFAULT_COMPANY_LEGAL,
         daily_cap=get_settings().daily_cap,
+        include_unsub_link=True,
     )
     db.add(row)
     db.flush()
@@ -48,7 +49,8 @@ def set_from_email(db: Session, email: str) -> AppSetting:
 
 
 def identity_complete(row: AppSetting) -> bool:
-    return bool(row.sender_name.strip() and row.company_legal.strip() and row.from_email.strip())
+    """Legal entity + connected From address. Display name comes from Gmail."""
+    return bool(row.company_legal.strip() and row.from_email.strip())
 
 
 def list_all(db: Session) -> AppSetting:

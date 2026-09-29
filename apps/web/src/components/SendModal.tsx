@@ -147,13 +147,26 @@ export function SendModal({
                     <span className="text-muted-foreground">Subject: </span>
                     {data.subject || <em className="text-danger">empty</em>}
                   </p>
-                  <pre className="max-h-64 overflow-y-auto px-3 py-2 font-mono text-xs whitespace-pre-wrap">
+                  <pre className="max-h-40 overflow-y-auto border-b px-3 py-2 font-mono text-xs whitespace-pre-wrap">
                     {data.body}
                   </pre>
+                  {data.signatureHtml ? (
+                    <div className="space-y-1 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Gmail signature (HTML)
+                      </p>
+                      <iframe
+                        title="Signature preview"
+                        sandbox=""
+                        srcDoc={`<!DOCTYPE html><html><body style="margin:0;font:13px/1.4 system-ui,sans-serif">${data.signatureHtml}</body></html>`}
+                        className="h-28 w-full rounded-[var(--radius-sm)] border bg-white"
+                      />
+                    </div>
+                  ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Plain text only. The identity block and the unsubscribe line are already
-                  included above.
+                  The body is plain text. The Gmail HTML signature, opt-out sentence, and
+                  unsubscribe line are included above.
                 </p>
               </div>
             </>

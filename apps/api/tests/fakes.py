@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass, field
 
-from app.gmail.client import GmailProfile
+from app.gmail.client import GmailProfile, GmailSendAs
 from app.gmail.exceptions import GmailAmbiguousError, GmailPermanentError
 from app.validation.base import DomainNotFoundError, ValidationResult
 
@@ -66,6 +66,11 @@ class FakeGmailClient:
     """Records what would have been sent."""
 
     email_address: str = "joey@kinnatic.ai"
+    display_name: str = "Joey"
+    signature_html: str = (
+        '<div dir="ltr"><b>Joey</b><br>CEO, Kinnatic Pty Ltd<br>'
+        '<a href="https://kinnatic.ai">kinnatic.ai</a></div>'
+    )
     sent_raw: list[str] = field(default_factory=list)
     next_message_id: str = "gmail-msg-1"
     fail_permanent: bool = False
@@ -77,6 +82,15 @@ class FakeGmailClient:
 
     def get_profile(self) -> GmailProfile:
         return GmailProfile(email_address=self.email_address, messages_total=len(self.sent_raw))
+
+    def get_send_as(self, email: str) -> GmailSendAs:
+        return GmailSendAs(
+            email_address=email or self.email_address,
+            display_name=self.display_name,
+            signature=self.signature_html,
+            is_primary=True,
+            is_default=True,
+        )
 
     def send(self, raw: str) -> str:
         if self.fail_permanent:

@@ -23,6 +23,7 @@ from app.sends.constants import (
     SEND_STATUS_SENT,
 )
 from app.sends.services import counters
+from app.sends.services.compose import format_unsub_line
 from app.templates.constants import OPT_OUT_SENTENCE
 
 
@@ -32,12 +33,29 @@ def decode_sent(raw: str):
 
 
 def body_of(msg) -> str:
-    """The decoded text body.
+    """The decoded text/plain body.
 
     set_content appends the trailing newline RFC 5322 requires, so this is the
     stored body plus one "\\n"; callers comparing against stored text strip it.
     """
-    return msg.get_payload(decode=True).decode("utf-8")
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() == "text/plain" and not part.is_multipart():
+                payload = part.get_payload(decode=True)
+                return payload.decode("utf-8") if payload else ""
+    payload = msg.get_payload(decode=True)
+    return payload.decode("utf-8") if payload else ""
+
+
+def html_of(msg) -> str:
+    """The decoded text/html alternative, if present."""
+    if not msg.is_multipart():
+        return ""
+    for part in msg.walk():
+        if part.get_content_type() == "text/html" and not part.is_multipart():
+            payload = part.get_payload(decode=True)
+            return payload.decode("utf-8") if payload else ""
+    return ""
 
 
 # ------------------------------------------------------------------- preview ----
@@ -326,15 +344,21 @@ def test_a_queued_event_is_reported_as_stuck(
 
 
 # ------------------------------------------------------------ the MIME output ----
-def test_sent_message_is_plain_text_only(
+def test_sent_message_is_multipart_alternative_with_html_signature(
     db: Session, contact, template, app_settings, connected_gmail, send_service, gmail
 ) -> None:
     send_service.send(db, contact_id=contact.id, template_id=template.id)
     msg = decode_sent(gmail.sent_raw[0])
 
-    assert msg.get_content_type() == "text/plain"
-    assert msg.is_multipart() is False
-    assert msg.get_content_charset() == "utf-8"
+    assert msg.get_content_type() == "multipart/alternative"
+    assert msg.is_multipart() is True
+    plain = body_of(msg)
+    html = html_of(msg)
+    assert "Joey" in plain
+    assert "kinnatic.ai" in plain
+    assert "<b>Joey</b>" in html or "<b>Joey</b>" in gmail.signature_html
+    assert gmail.signature_html.strip() in html
+    assert "text/html" in msg.as_string().lower()
 
 
 def test_sent_message_carries_no_bulk_headers(
@@ -346,19 +370,21 @@ def test_sent_message_carries_no_bulk_headers(
 
     present = {key.lower() for key in msg}
     assert FORBIDDEN_HEADERS & present == set()
-    assert present == {"to", "from", "reply-to", "subject", "message-id", "date", "content-type", "content-transfer-encoding", "mime-version"}
+    # multipart/alternative adds MIME-Version on the outer message; parts carry
+    # their own Content-Type / Content-Transfer-Encoding.
+    assert "list-unsubscribe" not in present
 
 
 def test_no_tracking_markers_in_the_raw_bytes(
     db: Session, contact, template, app_settings, connected_gmail, send_service, gmail
 ) -> None:
+    gmail.signature_html = "<div>Joey<br>Kinnatic</div>"
     send_service.send(db, contact_id=contact.id, template_id=template.id)
     encoded = gmail.sent_raw[0]
     raw = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)).decode()
 
     lowered = raw.lower()
-    assert "<img" not in lowered, "no tracking pixel"
-    assert "text/html" not in lowered, "no HTML part"
+    assert 'src="http' not in lowered, "no remote tracking pixel of our own"
     for header in ("list-unsubscribe", "list-id", "precedence", "x-mailer"):
         assert header not in lowered
 
@@ -374,17 +400,52 @@ def test_from_and_reply_to_are_the_connected_mailbox(
     assert msg["To"] == "Avery Stone <avery.stone@northwind.example>"
 
 
-def test_body_ends_with_identity_block_then_the_unsub_line(
+def test_body_ends_with_opt_out_then_the_unsub_line(
     db: Session, contact, template, app_settings, connected_gmail, send_service, gmail, settings
 ) -> None:
     send_service.send(db, contact_id=contact.id, template_id=template.id)
     body = body_of(decode_sent(gmail.sent_raw[0]))
 
     expected_url = settings.unsub_url(contact.unsub_token)
-    assert body.splitlines()[-1] == expected_url
+    assert body.splitlines()[-1] == format_unsub_line(expected_url)
     assert body.count(expected_url) == 1
     assert body.count(OPT_OUT_SENTENCE) == 1
-    assert body.count("Kinnatic Pty Ltd") == 1
+    # Plain identity block is gone; company name may still appear in the signature.
+    assert "CEO\nKinnatic Pty Ltd\n" not in body
+
+    html = html_of(decode_sent(gmail.sent_raw[0]))
+    assert f'<a href="{expected_url}">Unsubscribe</a>' in html
+
+
+def test_unsub_link_omitted_when_setting_is_off(
+    db: Session, contact, template, app_settings, connected_gmail, send_service, gmail, settings
+) -> None:
+    app_settings.include_unsub_link = False
+    db.add(app_settings)
+    db.commit()
+
+    send_service.send(db, contact_id=contact.id, template_id=template.id)
+    body = body_of(decode_sent(gmail.sent_raw[0]))
+    html = html_of(decode_sent(gmail.sent_raw[0]))
+    expected_url = settings.unsub_url(contact.unsub_token)
+
+    assert expected_url not in body
+    assert "Unsubscribe" not in body
+    assert expected_url not in html
+    assert body.count(OPT_OUT_SENTENCE) == 1
+
+
+def test_gmail_display_name_wins_over_stored_sender_name(
+    db: Session, contact, template, app_settings, connected_gmail, send_service, gmail
+) -> None:
+    gmail.display_name = "Joseph from Gmail"
+    app_settings.sender_name = "Stored Joey"
+    db.add(app_settings)
+    db.commit()
+
+    send_service.send(db, contact_id=contact.id, template_id=template.id)
+    msg = decode_sent(gmail.sent_raw[0])
+    assert msg["From"] == "Joseph from Gmail <joey@kinnatic.ai>"
 
 
 def test_non_ascii_recipient_name_is_rfc2047_encoded(

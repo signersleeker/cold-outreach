@@ -121,7 +121,6 @@ def evaluate_gates(i: GateInput) -> GateResult:
     missing_identity = [
         label
         for label, value in (
-            ("sender name", i.sender_name),
             ("legal company name", i.company_legal),
             ("from address", i.from_email),
         )
@@ -131,7 +130,7 @@ def evaluate_gates(i: GateInput) -> GateResult:
         blockers.append(
             GateFinding(
                 GATE_SETTINGS_INCOMPLETE,
-                f"Sender identity is incomplete: missing {', '.join(missing_identity)}.",
+                f"Sender settings incomplete: missing {', '.join(missing_identity)}.",
             )
         )
 

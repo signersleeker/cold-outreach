@@ -11,7 +11,7 @@
 export const GATE_LABELS: Record<string, string> = {
   // blockers
   gmail_not_connected: 'Gmail not connected',
-  settings_incomplete: 'Sender identity incomplete',
+  settings_incomplete: 'Sender settings incomplete',
   template_missing: 'Template missing',
   email_invalid: 'Invalid address',
   contact_suppressed: 'Suppressed',

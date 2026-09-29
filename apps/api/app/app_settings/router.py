@@ -20,6 +20,7 @@ def _to_dto(row: AppSetting, effective_cap: int) -> AppSettingsDTO:
         from_email=row.from_email,
         reply_hint=row.reply_hint,
         daily_cap=row.daily_cap,
+        include_unsub_link=row.include_unsub_link,
         effective_daily_cap=effective_cap,
         hard_max_daily_cap=HARD_MAX_DAILY_CAP,
         recommended_daily_cap=RECOMMENDED_DAILY_CAP,

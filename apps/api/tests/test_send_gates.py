@@ -91,7 +91,7 @@ def test_gmail_not_connected_blocks() -> None:
 
 
 @pytest.mark.parametrize(
-    "missing", [{"sender_name": ""}, {"company_legal": ""}, {"from_email": ""}]
+    "missing", [{"company_legal": ""}, {"from_email": ""}]
 )
 def test_incomplete_sender_identity_blocks(missing: dict) -> None:
     result = evaluate_gates(gate_input(**missing))
@@ -99,9 +99,15 @@ def test_incomplete_sender_identity_blocks(missing: dict) -> None:
 
 
 def test_missing_identity_field_is_named_in_the_message() -> None:
-    result = evaluate_gates(gate_input(sender_name=""))
+    result = evaluate_gates(gate_input(company_legal=""))
     message = next(f.message for f in result.blockers if f.code == GATE_SETTINGS_INCOMPLETE)
-    assert "sender name" in message
+    assert "legal company name" in message
+
+
+def test_blank_sender_name_alone_does_not_block() -> None:
+    """Display name comes from Gmail; stored sender_name is only a fallback."""
+    result = evaluate_gates(gate_input(sender_name=""))
+    assert GATE_SETTINGS_INCOMPLETE not in codes(result.blockers)
 
 
 def test_deleted_template_blocks() -> None:
@@ -304,7 +310,8 @@ def test_every_blocker_can_fire_at_once() -> None:
     result = evaluate_gates(
         gate_input(
             gmail_connected=False,
-            sender_name="",
+            company_legal="",
+            from_email="",
             template_exists=False,
             validation_status="invalid",
             is_suppressed=True,

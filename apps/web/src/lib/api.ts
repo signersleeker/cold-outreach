@@ -124,6 +124,8 @@ export interface GateFinding {
 export interface SendPreview {
   subject: string;
   body: string;
+  bodyHtml: string;
+  signatureHtml: string;
   unsubUrl: string;
   fromEmail: string;
   sendsToday: number;
@@ -162,6 +164,7 @@ export interface AppSettings {
   fromEmail: string;
   replyHint: string;
   dailyCap: number;
+  includeUnsubLink: boolean;
   effectiveDailyCap: number;
   hardMaxDailyCap: number;
   recommendedDailyCap: number;
@@ -177,6 +180,9 @@ export interface GmailStatus {
   status: string;
   lastError: string;
   lastValidatedAt: string | null;
+  displayName: string;
+  signatureHtml: string;
+  canReadSignature: boolean;
 }
 
 export interface Dashboard {

@@ -72,6 +72,11 @@ def _wire_state(app: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.database import get_engine
+    from app.migrations.runner import upgrade
+
+    # Apply any pending migrations on boot (CREATE TABLE IF NOT EXISTS — safe).
+    upgrade(get_engine())
     _wire_state(app)
     yield
 

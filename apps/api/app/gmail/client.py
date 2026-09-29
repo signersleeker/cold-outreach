@@ -30,6 +30,17 @@ class GmailProfile:
     messages_total: int
 
 
+@dataclass(frozen=True)
+class GmailSendAs:
+    """A sendAs identity, including the HTML signature Gmail stores for it."""
+
+    email_address: str
+    display_name: str
+    signature: str
+    is_primary: bool
+    is_default: bool
+
+
 @dataclass
 class GmailCredentials:
     """Everything needed to mint an access token for the connected mailbox."""
@@ -49,6 +60,8 @@ class GmailCredentials:
 
 class GmailClient(Protocol):
     def get_profile(self) -> GmailProfile: ...
+
+    def get_send_as(self, email: str) -> GmailSendAs: ...
 
     def send(self, raw: str) -> str: ...
 
@@ -134,6 +147,17 @@ class HttpGmailClient:
         return GmailProfile(
             email_address=payload.get("emailAddress", ""),
             messages_total=int(payload.get("messagesTotal") or 0),
+        )
+
+    def get_send_as(self, email: str) -> GmailSendAs:
+        """The sendAs settings Gmail stores for this address, including signature HTML."""
+        payload = self._request("GET", f"/settings/sendAs/{email}").json()
+        return GmailSendAs(
+            email_address=str(payload.get("sendAsEmail") or email),
+            display_name=str(payload.get("displayName") or ""),
+            signature=str(payload.get("signature") or ""),
+            is_primary=bool(payload.get("isPrimary")),
+            is_default=bool(payload.get("isDefault")),
         )
 
     def send(self, raw: str) -> str:

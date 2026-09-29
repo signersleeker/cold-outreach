@@ -81,11 +81,11 @@ export function DashboardPage() {
 
         {!data.identityComplete ? (
           <div className="rounded-[var(--radius-sm)] border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning">
-            Sender identity is incomplete.{' '}
+            Legal company name or From address is missing.{' '}
             <Link to="/settings" className="font-semibold underline">
-              Fill it in
+              Check Settings
             </Link>{' '}
-            — every send is blocked until it is.
+            — every send is blocked until both are set (From comes from Gmail).
           </div>
         ) : null}
 

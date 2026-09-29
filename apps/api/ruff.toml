@@ -10,3 +10,5 @@ ignore = ["B008"] # FastAPI Depends() in defaults is the documented idiom
 # Holds the email template bodies verbatim. Reflowing them would change what
 # goes out on the wire, so long lines stay.
 "app/templates/constants.py" = ["E501"]
+# Raw DDL reads better on one line than wrapped mid-statement.
+"app/migrations/versions/*" = ["E501"]

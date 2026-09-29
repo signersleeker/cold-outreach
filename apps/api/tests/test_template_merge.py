@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import pytest
 
+from app.gmail.mime import build_message_parts, html_to_plain
 from app.lib.text import count_http_links
 from app.sends.services.compose import (
     append_unsub_line,
-    build_identity_block,
-    compose_final_body,
-    ensure_identity_block,
-    has_identity_block,
+    compose_gate_body,
+    ensure_opt_out,
+    format_unsub_line,
+    has_opt_out,
 )
 from app.templates.constants import (
     FIRST_TOUCH_BODY,
@@ -163,9 +164,10 @@ def test_first_touch_blocks_when_company_is_missing() -> None:
     assert result.leftover_tags == ("{{company}}",)
 
 
-def test_both_seeded_templates_carry_the_opt_out_sentence() -> None:
+def test_both_seeded_templates_leave_opt_out_to_compose() -> None:
+    """Opt-out is appended at send time, not baked into the seed bodies."""
     for body in (FIRST_TOUCH_BODY, FOLLOW_UP_BODY):
-        assert OPT_OUT_SENTENCE in body
+        assert OPT_OUT_SENTENCE not in body
 
 
 def test_seeded_templates_contain_no_unsubscribe_footer_language() -> None:
@@ -176,49 +178,29 @@ def test_seeded_templates_contain_no_unsubscribe_footer_language() -> None:
         assert "http" not in lowered
 
 
-# --------------------------------------------------------- identity block ----
-def test_build_identity_block_shape() -> None:
-    assert build_identity_block("Joey", "CEO", "Kinnatic Pty Ltd") == (
-        f"Joey\nCEO\nKinnatic Pty Ltd\n{OPT_OUT_SENTENCE}"
-    )
-
-
-def test_identity_block_appended_to_a_bare_body() -> None:
-    out = ensure_identity_block("Hi Avery,\n\nShort note.", **IDENTITY)
+# ------------------------------------------------------------- opt-out ----
+def test_ensure_opt_out_appended_to_a_bare_body() -> None:
+    out = ensure_opt_out("Hi Avery,\n\nShort note.")
     assert out.endswith(OPT_OUT_SENTENCE)
-    assert "Kinnatic Pty Ltd" in out
 
 
-def test_identity_block_is_not_duplicated_on_the_seeded_body() -> None:
-    """The seeded first-touch body already ends with the block."""
-    rendered = render(FIRST_TOUCH_SUBJECT, FIRST_TOUCH_BODY, full_context()).body
-    assert has_identity_block(rendered, "Kinnatic Pty Ltd") is True
-    assert ensure_identity_block(rendered, **IDENTITY) == rendered
-    assert rendered.count(OPT_OUT_SENTENCE) == 1
-
-
-def test_ensure_identity_block_is_idempotent() -> None:
-    once = ensure_identity_block("Hi Avery,", **IDENTITY)
-    assert ensure_identity_block(once, **IDENTITY) == once
+def test_ensure_opt_out_is_idempotent() -> None:
+    once = ensure_opt_out("Hi Avery,")
+    assert ensure_opt_out(once) == once
     assert once.count(OPT_OUT_SENTENCE) == 1
 
 
-def test_identity_block_detected_through_curly_apostrophes() -> None:
+def test_opt_out_detected_through_curly_apostrophes() -> None:
     """A template edited in a word processor gets typographic quotes."""
-    curly = "Hi Avery,\n\nJoey\nCEO\nKinnatic Pty Ltd\nIf this isn’t relevant, reply “no” and I won’t email again."
-    assert has_identity_block(curly, "Kinnatic Pty Ltd") is True
-    assert ensure_identity_block(curly, **IDENTITY) == curly
-
-
-def test_opt_out_without_the_company_is_not_a_complete_block() -> None:
-    body = f"Hi Avery,\n\n{OPT_OUT_SENTENCE}"
-    assert has_identity_block(body, "Kinnatic Pty Ltd") is False
+    curly = "Hi Avery,\n\nIf this isn’t relevant, reply “no” and I won’t email again."
+    assert has_opt_out(curly) is True
+    assert ensure_opt_out(curly) == curly
 
 
 # ------------------------------------------------------------- unsub line ----
 def test_unsub_line_is_on_its_own_line() -> None:
     out = append_unsub_line("Body text.", "http://localhost:8000/u/abc123")
-    assert out.splitlines()[-1] == "http://localhost:8000/u/abc123"
+    assert out.splitlines()[-1] == format_unsub_line("http://localhost:8000/u/abc123")
 
 
 def test_unsub_line_is_idempotent() -> None:
@@ -229,28 +211,47 @@ def test_unsub_line_is_idempotent() -> None:
 
 
 # ------------------------------------------------------ full composition ----
-def test_compose_final_body_appends_each_part_exactly_once() -> None:
+def test_compose_gate_body_appends_opt_out_and_unsub_once() -> None:
     rendered = render(FIRST_TOUCH_SUBJECT, FIRST_TOUCH_BODY, full_context()).body
     url = "http://localhost:8000/u/tok"
-    final = compose_final_body(rendered, unsub_url=url, **IDENTITY)
+    final = compose_gate_body(rendered, unsub_url=url)
 
     assert final.count(OPT_OUT_SENTENCE) == 1
-    assert final.count("Kinnatic Pty Ltd") == 1
     assert final.count(url) == 1
-    assert final.splitlines()[-1] == url
+    assert final.splitlines()[-1] == format_unsub_line(url)
+    assert "Kinnatic Pty Ltd" not in final
 
 
-def test_compose_final_body_is_idempotent() -> None:
+def test_compose_gate_body_is_idempotent() -> None:
     rendered = render(FIRST_TOUCH_SUBJECT, FIRST_TOUCH_BODY, full_context()).body
     url = "http://localhost:8000/u/tok"
-    once = compose_final_body(rendered, unsub_url=url, **IDENTITY)
-    assert compose_final_body(once, unsub_url=url, **IDENTITY) == once
+    once = compose_gate_body(rendered, unsub_url=url)
+    assert compose_gate_body(once, unsub_url=url) == once
 
 
-def test_composed_body_has_exactly_one_link() -> None:
+def test_gate_body_has_exactly_one_link() -> None:
     rendered = render(FIRST_TOUCH_SUBJECT, FIRST_TOUCH_BODY, full_context()).body
-    final = compose_final_body(rendered, unsub_url="http://localhost:8000/u/tok", **IDENTITY)
+    final = compose_gate_body(rendered, unsub_url="http://localhost:8000/u/tok")
     assert count_http_links(final) == 1, "only the unsubscribe URL"
+
+
+def test_message_parts_include_signature_without_counting_its_links_in_gate_body() -> None:
+    rendered = render(FIRST_TOUCH_SUBJECT, FIRST_TOUCH_BODY, full_context()).body
+    url = "http://localhost:8000/u/tok"
+    sig = '<div><b>Joey</b><br><a href="https://kinnatic.ai">kinnatic.ai</a></div>'
+    gate = compose_gate_body(rendered, unsub_url=url)
+    plain, html = build_message_parts(
+        rendered_body=rendered, signature_html=sig, unsub_url=url
+    )
+
+    assert count_http_links(gate) == 1
+    assert "kinnatic.ai" in plain
+    assert count_http_links(plain) == 1, "stripped signature keeps link text, not the href"
+    assert sig.strip() in html
+    assert html_to_plain(sig) in plain
+    # Extra blank line between pitch and signature (two newlines beyond the join gap).
+    assert f"{rendered.rstrip()}\n\n\n{html_to_plain(sig)}" in plain
+    assert "<div><br></div>" in html
 
 
 # --------------------------------------------------------------- link count ----

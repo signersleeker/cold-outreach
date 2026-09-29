@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import CheckConstraint, DateTime, Integer, String, Text, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -31,6 +31,11 @@ class AppSetting(Base):
     reply_hint: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
 
     daily_cap: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("20"))
+
+    # When false, outbound mail skips the per-contact unsubscribe URL footer.
+    include_unsub_link: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
 
     last_inbox_sync_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 

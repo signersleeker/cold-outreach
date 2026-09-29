@@ -26,18 +26,35 @@ FIRST_TOUCH_BODY = """Hi {{first_name}},
 
 I work with {{title}} types at regulated orgs on shadow AI and pre-execution control (APRA / on-prem / audit trail), not another Copilot wrapper.
 
+If {{company}} is already tight on this, ignore. If useful I can send a one-pager."""
+
+FOLLOW_UP_NAME = "Follow up"
+FOLLOW_UP_SUBJECT = "re: shadow AI + pre-execution control"
+FOLLOW_UP_BODY = """Hi {{first_name}},
+
+Following up once on the note below, then I'll leave it."""
+
+# Bodies that still match the pre-signature-HTML seed text. Seed rewrites these
+# exactly so a hand-edited template is left alone.
+_LEGACY_FIRST_TOUCH_BODY = """Hi {{first_name}},
+
+I work with {{title}} types at regulated orgs on shadow AI and pre-execution control (APRA / on-prem / audit trail), not another Copilot wrapper.
+
 If {{company}} is already tight on this, ignore. If useful I can send a one-pager.
 
 Joey
 Kinnatic Pty Ltd
 If this isn't relevant, reply "no" and I won't email again."""
 
-FOLLOW_UP_NAME = "Follow up"
-FOLLOW_UP_SUBJECT = "re: shadow AI + pre-execution control"
-FOLLOW_UP_BODY = """Hi {{first_name}},
+_LEGACY_FOLLOW_UP_BODY = """Hi {{first_name}},
 
 Following up once on the note below, then I'll leave it.
 
 Joey
 Kinnatic Pty Ltd
 If this isn't relevant, reply "no" and I won't email again."""
+
+LEGACY_TEMPLATE_BODIES = {
+    FIRST_TOUCH_NAME: _LEGACY_FIRST_TOUCH_BODY,
+    FOLLOW_UP_NAME: _LEGACY_FOLLOW_UP_BODY,
+}

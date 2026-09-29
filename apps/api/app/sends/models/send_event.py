@@ -30,7 +30,7 @@ class SendEvent(Base):
         PgUUID(as_uuid=True), ForeignKey("templates.id", ondelete="SET NULL")
     )
 
-    # The exact bytes that went out, including the identity block and unsub line.
+    # The exact bytes that went out, including the signature, opt-out and unsub line.
     subject_rendered: Mapped[str] = mapped_column(Text, nullable=False)
     body_rendered: Mapped[str] = mapped_column(Text, nullable=False)
 

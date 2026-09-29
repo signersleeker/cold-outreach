@@ -1,11 +1,11 @@
-"""Final body assembly: identity block + unsubscribe line. Pure — no I/O.
+"""Final body assembly: opt-out sentence + unsubscribe line. Pure — no I/O.
 
-Order is: rendered body -> identity block (if not already there) -> blank line
--> unsubscribe URL on its own line.
+Order for the gate body (no signature): rendered body -> opt-out (if missing)
+-> blank line -> unsubscribe URL.
 
-Both append steps must be idempotent. The seeded first-touch template already
-ends with the sender name, the company, and the opt-out sentence, so a naive
-append would sign every email twice.
+The HTML signature from Gmail is attached later in mime.py. It is deliberately
+kept out of this module so the multiple_links warning never counts signature
+links.
 """
 
 from __future__ import annotations
@@ -13,69 +13,64 @@ from __future__ import annotations
 from app.lib.text import comparable, non_empty_lines
 from app.templates.constants import OPT_OUT_SENTENCE
 
-# How far back to look for an existing identity block. The block itself is 4
-# lines; a couple of spare lines absorbs an operator's extra sign-off line.
 _TAIL_LINES = 8
 
 
-def build_identity_block(sender_name: str, sender_title: str, company_legal: str) -> str:
-    """The plain-text identity footer.
+def has_opt_out(body: str) -> bool:
+    """True when the body already ends with the human opt-out sentence.
 
-    This is sender identification as required of a commercial electronic
-    message, plus a human opt-out sentence. It is deliberately NOT a marketing
-    unsubscribe footer, and there is no List-Unsubscribe header to match it.
-    """
-    lines = [sender_name, sender_title, company_legal, OPT_OUT_SENTENCE]
-    return "\n".join(line for line in lines if line)
-
-
-def has_identity_block(body: str, company_legal: str) -> bool:
-    """True when the body already ends with an identity block.
-
-    Requires both the legal entity name and the opt-out sentence, compared
-    case-, quote- and whitespace-insensitively so a curly apostrophe or a
-    rewrapped line still matches.
+    Compared case-, quote- and whitespace-insensitively so a curly apostrophe
+    or a rewrapped line still matches.
     """
     tail = comparable("\n".join(non_empty_lines(body)[-_TAIL_LINES:]))
     if not tail:
         return False
-    has_opt_out = comparable(OPT_OUT_SENTENCE) in tail
-    has_entity = bool(company_legal) and comparable(company_legal) in tail
-    return has_opt_out and has_entity
+    return comparable(OPT_OUT_SENTENCE) in tail
 
 
-def ensure_identity_block(
-    body: str, *, sender_name: str, sender_title: str, company_legal: str
-) -> str:
-    """Append the identity block unless one is already present. Idempotent."""
-    if has_identity_block(body, company_legal):
+def ensure_opt_out(body: str) -> str:
+    """Append the opt-out sentence unless one is already present. Idempotent."""
+    if has_opt_out(body):
         return body
-    block = build_identity_block(sender_name, sender_title, company_legal)
-    if not block:
-        return body
-    return f"{body.rstrip()}\n\n{block}"
+    if not body.strip():
+        return OPT_OUT_SENTENCE
+    return f"{body.rstrip()}\n\n{OPT_OUT_SENTENCE}"
+
+
+def format_unsub_line(unsub_url: str) -> str:
+    """Plain-text unsubscribe footer.
+
+    Plain text cannot hide a URL behind a word, so the address stays visible
+    for text-only clients. The HTML alternative uses link text "Unsubscribe".
+    """
+    return f"Unsubscribe: {unsub_url}"
 
 
 def append_unsub_line(body: str, unsub_url: str) -> str:
-    """Put the unsubscribe URL on its own line. Idempotent."""
+    """Put the unsubscribe line on its own line. Idempotent."""
     if not unsub_url or unsub_url in body:
         return body
-    return f"{body.rstrip()}\n\n{unsub_url}"
+    return f"{body.rstrip()}\n\n{format_unsub_line(unsub_url)}"
 
 
-def compose_final_body(
+def compose_gate_body(rendered_body: str, *, unsub_url: str) -> str:
+    """Body used for gates and link counting — no Gmail signature."""
+    return append_unsub_line(ensure_opt_out(rendered_body), unsub_url)
+
+
+def compose_plain_body(
     rendered_body: str,
     *,
-    sender_name: str,
-    sender_title: str,
-    company_legal: str,
+    signature_plain: str,
     unsub_url: str,
 ) -> str:
-    """The exact body that will be sent, and the one shown in the preview."""
-    body = ensure_identity_block(
-        rendered_body,
-        sender_name=sender_name,
-        sender_title=sender_title,
-        company_legal=company_legal,
-    )
-    return append_unsub_line(body, unsub_url)
+    """The exact plain-text body that will be sent and archived.
+
+    Order: rendered body -> tag-stripped signature -> opt-out -> unsub URL.
+    """
+    parts = [rendered_body.rstrip()]
+    sig = signature_plain.strip()
+    if sig:
+        parts.append(sig)
+    body = "\n\n".join(p for p in parts if p)
+    return append_unsub_line(ensure_opt_out(body), unsub_url)

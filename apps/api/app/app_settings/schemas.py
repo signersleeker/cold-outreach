@@ -15,6 +15,7 @@ class AppSettingsDTO(CamelModel):
     from_email: str
     reply_hint: str
     daily_cap: int
+    include_unsub_link: bool
     effective_daily_cap: int
     hard_max_daily_cap: int
     recommended_daily_cap: int
@@ -28,6 +29,7 @@ class AppSettingsPatchRequest(CamelModel):
     company_legal: str | None = Field(default=None, max_length=200)
     reply_hint: str | None = None
     daily_cap: int | None = Field(default=None, ge=1, le=HARD_MAX_DAILY_CAP)
+    include_unsub_link: bool | None = None
     # from_email is intentionally absent. Gmail forces the authenticated account
     # as the sender, so a hand-typed value could only ever disagree with reality;
     # it is written from the Gmail profile after OAuth.

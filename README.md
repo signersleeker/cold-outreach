@@ -11,7 +11,7 @@ Australia/Brisbane calendar day.
 - No sequences, no queues, no scheduler. One send is one deliberate human action.
 - No open tracking, click tracking, or tracking pixels.
 - No `List-Unsubscribe`, `List-Unsubscribe-Post`, `List-ID` or `Precedence: bulk` headers.
-- No HTML. Every message is `text/plain` only.
+- No HTML in the pitch. The body is plain text; only the Gmail account signature is HTML.
 
 The gates are the product. Everything below exists to stop a send that should not happen.
 
@@ -56,10 +56,18 @@ Fill in `SECRET_KEY` and `OUTREACH_APP_PASSWORD` — generate each with:
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-Then create the schema and seed the two default templates:
+Then migrate the schema and seed the two default templates:
 
 ```bash
 cd apps/api && pip install -r requirements.txt && python -m app.cli.seed
+```
+
+`seed` runs migrations (`up`) then inserts defaults. To migrate without seeding:
+
+```bash
+npm run migrate            # apply pending
+npm run migrate:status     # list applied / pending
+npm run migrate:down       # roll back one step
 ```
 
 Start the API:
@@ -101,7 +109,8 @@ Nothing can be sent until a mailbox is connected. The address you authorise beco
    - Choose **Internal** if this is a Google Workspace account. Strongly recommended — see the
      warning below.
    - If you must use **External**, add your own Google account under **Test users**.
-   - Scopes requested: `gmail.send` and `gmail.readonly`.
+   - Scopes requested: `gmail.send`, `gmail.readonly`, and `gmail.settings.basic`
+     (the last one reads the HTML signature on the sendAs identity).
 4. **APIs & Services → Credentials → Create credentials → OAuth client ID.**
    - Application type: **Web application** (not Desktop).
    - Authorised redirect URI, exactly:
@@ -193,7 +202,7 @@ did.
 | Code                     | Cleared by                                                       |
 | ------------------------ | ---------------------------------------------------------------- |
 | `gmail_not_connected`    | Connecting a mailbox in Settings                                 |
-| `settings_incomplete`    | Filling in sender name, legal company name (from address is auto) |
+| `settings_incomplete`    | Legal company name on the settings row, and a connected From address   |
 | `template_missing`       | Choosing a template that still exists                            |
 | `email_invalid`          | Nothing. Invalid addresses are never sent to                     |
 | `contact_suppressed`     | Nothing automatic. Only a manual removal from Suppressions        |
@@ -211,19 +220,35 @@ acknowledgement), `consumer_domain`, `missing_company`, `missing_title`, `multip
 
 ### What gets appended
 
-Every outgoing body ends with an identity block and, on its own line, a unique unsubscribe URL:
+Every outgoing body ends with the Gmail account HTML signature (when the mailbox
+grant includes `gmail.settings.basic`), the human opt-out sentence, and on its
+own line a unique unsubscribe URL:
 
 ```
+Hi Avery,
+
+…
+
 Joey
-CEO
-Kinnatic Pty Ltd
+CEO, Kinnatic Pty Ltd
+kinnatic.ai
+
 If this isn't relevant, reply "no" and I won't email again.
 
-http://localhost:8000/u/<token>
+Unsubscribe: http://localhost:8000/u/<token>
 ```
 
-Both appends are idempotent. The seeded first-touch template already ends with that block, so it is
-detected and not duplicated — including when an operator's edit introduced curly apostrophes.
+The pitch stays plain text. The signature is the same HTML Gmail stores under
+Settings → Signature for that sendAs address — logos and links included. Edit it
+in Gmail; this app only reads it. Signature links do not count toward the
+`multiple_links` warning.
+
+The unsubscribe URL can be turned off in **Settings → Unsubscribe link**. When
+off, the opt-out sentence and signature still go out; only the per-contact URL
+is skipped.
+
+Both the opt-out and unsub appends are idempotent. Disconnect and reconnect
+Gmail once after upgrading so the token picks up the settings scope.
 
 Merge fields follow one rule: **an empty value leaves its `{{tag}}` in place, and a leftover tag is a
 hard blocker.** A contact with no company therefore cannot receive a template that mentions
@@ -291,7 +316,8 @@ sync will not resurrect an opted-out address.
 
 ```bash
 npm run dev          # API + UI together
-npm run seed         # create tables, seed templates (idempotent)
+npm run migrate      # apply pending schema migrations
+npm run seed         # migrate + seed templates (idempotent)
 npm run test         # pytest
 npm run db:up        # start Postgres
 npm run reconcile    # resolve stuck queued sends
@@ -314,7 +340,7 @@ best-covered part of the app:
 | File                     | Covers                                                                 |
 | ------------------------ | ---------------------------------------------------------------------- |
 | `test_send_gates.py`     | Every blocker and warning; acknowledgement cannot clear a blocker       |
-| `test_template_merge.py` | Substitution, leftover detection, idempotent identity block            |
+| `test_template_merge.py` | Substitution, leftover detection, idempotent opt-out / unsub append   |
 | `test_csv_mapping.py`    | Header aliases, BOM/CRLF, dedupe, name splitting, encoding fallback    |
 | `test_validation.py`     | Null MX, NXDOMAIN, A-record fallback, ZeroBounce status mapping        |
 | `test_daily_cap_tz.py`   | The 14:00 UTC boundary, and concurrent reservations never exceed the cap |

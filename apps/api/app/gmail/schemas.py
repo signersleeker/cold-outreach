@@ -14,3 +14,7 @@ class GmailStatusDTO(CamelModel):
     last_error: str
     last_validated_at: dt.datetime | None
     # Tokens are never included here, in any form.
+    display_name: str = ""
+    signature_html: str = ""
+    # False when connected but the token lacks gmail.settings.basic — reconnect.
+    can_read_signature: bool = False

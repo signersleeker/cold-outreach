@@ -1,10 +1,10 @@
-"""Create tables and seed defaults. Idempotent — safe to re-run.
+"""Create schema via migrations and seed defaults. Idempotent — safe to re-run.
 
     python -m app.cli.seed
     python -m app.cli.seed --drop     # destroys all data first
 
-No Alembic: the schema is created from the SQLAlchemy models, which is what the
-brief asks for and is the right trade for a single-operator internal tool.
+Schema changes live in app/migrations (up/down). This command runs migrate up,
+then inserts the singleton settings row and default templates when missing.
 """
 
 from __future__ import annotations
@@ -13,13 +13,14 @@ import argparse
 import sys
 
 from dotenv import load_dotenv
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.app_settings.app_setting import SETTINGS_ID, AppSetting
 from app.config import get_settings
 from app.contacts.contact import Contact
 from app.contacts.service import new_unsub_token
 from app.database import Base, SessionLocal, get_engine, import_all_models, reset_engine
+from app.migrations.runner import upgrade
 from app.templates.constants import (
     DEFAULT_COMPANY_LEGAL,
     DEFAULT_SENDER_NAME,
@@ -30,6 +31,7 @@ from app.templates.constants import (
     FOLLOW_UP_BODY,
     FOLLOW_UP_NAME,
     FOLLOW_UP_SUBJECT,
+    LEGACY_TEMPLATE_BODIES,
 )
 from app.templates.template import Template
 
@@ -53,9 +55,16 @@ def seed(drop: bool = False) -> None:
     if drop:
         print("dropping all tables…")
         Base.metadata.drop_all(engine)
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS schema_migrations"))
 
-    print("creating tables…")
-    Base.metadata.create_all(engine)
+    print("migrating…")
+    applied = upgrade(engine)
+    if applied:
+        for version in applied:
+            print(f"  applied {version}")
+    else:
+        print("  already up to date")
 
     db = SessionLocal()
     try:
@@ -68,6 +77,7 @@ def seed(drop: bool = False) -> None:
                     sender_title=DEFAULT_SENDER_TITLE,
                     company_legal=DEFAULT_COMPANY_LEGAL,
                     daily_cap=get_settings().daily_cap,
+                    include_unsub_link=True,
                 )
             )
             print(
@@ -78,9 +88,14 @@ def seed(drop: bool = False) -> None:
             print("settings already present, left alone")
 
         for name, subject, body in _DEFAULT_TEMPLATES:
-            if db.scalar(select(Template).where(Template.name == name)) is None:
+            existing = db.scalar(select(Template).where(Template.name == name))
+            if existing is None:
                 db.add(Template(name=name, subject=subject, body=body))
                 print(f"seeded template: {name}")
+            elif existing.body == LEGACY_TEMPLATE_BODIES.get(name):
+                existing.body = body
+                db.add(existing)
+                print(f"updated template body (dropped plain identity footer): {name}")
             else:
                 print(f"template already present: {name}")
 
@@ -101,7 +116,7 @@ def seed(drop: bool = False) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create tables and seed defaults.")
+    parser = argparse.ArgumentParser(description="Migrate schema and seed defaults.")
     parser.add_argument(
         "--drop",
         action="store_true",

@@ -181,14 +181,20 @@ def test_mime_module_sets_only_the_expected_headers() -> None:
     assert assigned == {"To", "From", "Reply-To", "Subject", "Message-ID", "Date"}
 
 
-def test_the_outgoing_message_is_never_html() -> None:
-    """Scoped to the send path.
+def test_the_outgoing_message_keeps_html_only_for_the_gmail_signature() -> None:
+    """Body stays plain; only gmail/mime.py builds the HTML alternative for the signature.
 
-    app/inbox/parsing.py legitimately reads text/html out of *incoming* replies;
-    what matters is that nothing we construct is HTML.
+    app/inbox/parsing.py legitimately reads text/html out of *incoming* replies.
     """
+    mime = APP / "gmail" / "mime.py"
     for path in [*python_files("gmail"), *python_files("sends"), *python_files("templates")]:
+        if path.resolve() == mime.resolve():
+            continue
         code = code_only(path).lower()
         assert "text/html" not in code, f"{path.relative_to(APP)} builds an HTML part"
         assert 'subtype = "html"' not in code
-        assert "add_alternative" not in code, "no multipart/alternative"
+        assert "add_alternative" not in code, "no multipart/alternative outside mime.py"
+
+    mime_code = code_only(mime).lower()
+    assert "add_alternative" in mime_code
+    assert 'subtype = "html"' in mime_code

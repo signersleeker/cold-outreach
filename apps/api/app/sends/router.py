@@ -27,6 +27,8 @@ def _preview_dto(preview: SendPreview) -> SendPreviewDTO:
     return SendPreviewDTO(
         subject=preview.subject,
         body=preview.body,
+        body_html=preview.body_html,
+        signature_html=preview.signature_html,
         unsub_url=preview.unsub_url,
         from_email=preview.from_email,
         sends_today=preview.sends_today,

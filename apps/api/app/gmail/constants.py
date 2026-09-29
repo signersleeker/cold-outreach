@@ -8,9 +8,13 @@ GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me"
 # gmail.send to deliver, gmail.readonly to read replies and bounces for the
 # Sync inbox button. gmail.metadata cannot see message bodies, so it cannot
 # support stop-word matching; readonly is the narrowest scope that works.
+# gmail.settings.basic reads the sendAs signature so outbound mail can carry
+# the same HTML footer the operator sees when composing in Gmail.
+GMAIL_SETTINGS_SCOPE = "https://www.googleapis.com/auth/gmail.settings.basic"
 GMAIL_SCOPES = (
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.readonly",
+    GMAIL_SETTINGS_SCOPE,
 )
 
 OAUTH_STATE_TTL_MINUTES = 15

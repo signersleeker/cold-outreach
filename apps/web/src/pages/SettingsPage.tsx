@@ -5,7 +5,8 @@ import { ErrorBanner, PageHeader } from '@/components/AppLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, Input, Textarea } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, Input } from '@/components/ui/input';
 import {
   useAppSettings,
   useDisconnectGmail,
@@ -22,23 +23,13 @@ export function SettingsPage() {
   const disconnect = useDisconnectGmail();
   const [params, setParams] = useSearchParams();
 
-  const [draft, setDraft] = useState({
-    senderName: '',
-    senderTitle: '',
-    companyLegal: '',
-    replyHint: '',
-    dailyCap: 20,
-  });
+  const [dailyCap, setDailyCap] = useState(20);
+  const [includeUnsubLink, setIncludeUnsubLink] = useState(true);
 
   useEffect(() => {
     if (settings) {
-      setDraft({
-        senderName: settings.senderName,
-        senderTitle: settings.senderTitle,
-        companyLegal: settings.companyLegal,
-        replyHint: settings.replyHint,
-        dailyCap: settings.dailyCap,
-      });
+      setDailyCap(settings.dailyCap);
+      setIncludeUnsubLink(settings.includeUnsubLink);
     }
   }, [settings?.updatedAt]);
 
@@ -54,7 +45,12 @@ export function SettingsPage() {
     );
   }
 
-  const overCap = draft.dailyCap > settings.recommendedDailyCap;
+  const overCap = dailyCap > settings.recommendedDailyCap;
+
+  const toggleUnsub = (checked: boolean) => {
+    setIncludeUnsubLink(checked);
+    update.mutate({ includeUnsubLink: checked });
+  };
 
   return (
     <>
@@ -92,6 +88,12 @@ export function SettingsPage() {
                   <span className="text-muted-foreground">Sending as</span>
                   <span className="font-mono">{gmail.email}</span>
                 </div>
+                {gmail.displayName ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Display name</span>
+                    <span>{gmail.displayName}</span>
+                  </div>
+                ) : null}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Connected</span>
                   <span>{formatDateTime(gmail.lastValidatedAt)}</span>
@@ -100,6 +102,44 @@ export function SettingsPage() {
                   Scopes: <span className="font-mono">{gmail.scopes.join(' ')}</span>
                 </p>
                 {gmail.lastError ? <p className="text-danger">{gmail.lastError}</p> : null}
+
+                {!gmail.canReadSignature ? (
+                  <div className="space-y-2 rounded-[var(--radius-sm)] border border-warning/30 bg-warning-subtle px-3 py-2 text-warning">
+                    <p>
+                      This connection cannot read your Gmail signature. Disconnect and connect
+                      again to grant the settings permission — then every send can carry the same
+                      HTML signature you use in Gmail.
+                    </p>
+                    <Button
+                      variant="outline"
+                      disabled={disconnect.isPending}
+                      onClick={() => disconnect.mutate()}
+                    >
+                      <Unlink />
+                      Disconnect to reconnect
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-muted-foreground">
+                      Signature below is read from Gmail. Edit it in Gmail → Settings → See all
+                      settings → Signature. It is appended to every send.
+                    </p>
+                    {gmail.signatureHtml ? (
+                      <iframe
+                        title="Gmail signature preview"
+                        sandbox=""
+                        srcDoc={`<!DOCTYPE html><html><body style="margin:0;font:13px/1.4 system-ui,sans-serif">${gmail.signatureHtml}</body></html>`}
+                        className="h-40 w-full rounded-[var(--radius-sm)] border bg-white"
+                      />
+                    ) : (
+                      <p className="rounded-[var(--radius-sm)] border border-dashed px-3 py-2 text-muted-foreground">
+                        No signature is set on this mailbox in Gmail yet.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <Button
                   variant="outline"
                   disabled={disconnect.isPending}
@@ -114,7 +154,8 @@ export function SettingsPage() {
                 <p className="text-muted-foreground">
                   Nothing can be sent until a mailbox is connected. The address you authorise
                   becomes the From and Reply-To for every email — Gmail forces this, so it cannot
-                  be set by hand.
+                  be set by hand. Your Gmail HTML signature is read from the account and appended
+                  to each send.
                 </p>
                 {gmail && !gmail.configured ? (
                   <p className="text-danger">
@@ -144,51 +185,24 @@ export function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Sender identity</CardTitle>
-            <Button
-              size="sm"
-              disabled={update.isPending}
-              onClick={() => update.mutate(draft)}
-            >
-              {update.isPending ? 'Saving…' : 'Save'}
-            </Button>
+            <CardTitle>Unsubscribe link</CardTitle>
           </CardHeader>
-          <CardBody className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              These appear in the identity block appended to every email. Accurate sender
-              identification is a legal requirement for a commercial electronic message, so a send
-              is blocked while any of them is blank.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Sender name">
-                <Input
-                  value={draft.senderName}
-                  onChange={(e) => setDraft((d) => ({ ...d, senderName: e.target.value }))}
-                />
-              </Field>
-              <Field label="Sender title">
-                <Input
-                  value={draft.senderTitle}
-                  onChange={(e) => setDraft((d) => ({ ...d, senderTitle: e.target.value }))}
-                />
-              </Field>
-              <Field label="Legal company name">
-                <Input
-                  value={draft.companyLegal}
-                  onChange={(e) => setDraft((d) => ({ ...d, companyLegal: e.target.value }))}
-                />
-              </Field>
-              <Field label="From address" hint="Read from the Gmail profile. Not editable.">
-                <Input value={settings.fromEmail} readOnly className="bg-muted text-muted-foreground" />
-              </Field>
-            </div>
-            <Field label="Reply hint" hint="A note to yourself, shown in the app. Never an email header.">
-              <Textarea
-                rows={2}
-                value={draft.replyHint}
-                onChange={(e) => setDraft((d) => ({ ...d, replyHint: e.target.value }))}
+          <CardBody className="space-y-2">
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs">
+              <Checkbox
+                checked={includeUnsubLink}
+                disabled={update.isPending}
+                onCheckedChange={(checked) => toggleUnsub(checked === true)}
+                className="mt-0.5"
               />
-            </Field>
+              <span>
+                <span className="font-medium">Append an Unsubscribe link to every send</span>
+                <span className="mt-0.5 block text-muted-foreground">
+                  When off, mail still includes the opt-out sentence and your Gmail signature, but
+                  not the per-contact unsubscribe URL.
+                </span>
+              </span>
+            </label>
             <ErrorBanner error={update.error} />
           </CardBody>
         </Card>
@@ -196,6 +210,13 @@ export function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Daily cap</CardTitle>
+            <Button
+              size="sm"
+              disabled={update.isPending}
+              onClick={() => update.mutate({ dailyCap })}
+            >
+              {update.isPending ? 'Saving…' : 'Save'}
+            </Button>
           </CardHeader>
           <CardBody className="space-y-2">
             <Field
@@ -207,10 +228,8 @@ export function SettingsPage() {
                 min={1}
                 max={settings.hardMaxDailyCap}
                 className="max-w-28"
-                value={draft.dailyCap}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, dailyCap: Number(e.target.value) || 1 }))
-                }
+                value={dailyCap}
+                onChange={(e) => setDailyCap(Number(e.target.value) || 1)}
               />
             </Field>
             {overCap ? (
@@ -219,6 +238,7 @@ export function SettingsPage() {
                 to damage your domain reputation. The low cap is the product, not a limitation.
               </p>
             ) : null}
+            <ErrorBanner error={update.error} />
           </CardBody>
         </Card>
       </div>
