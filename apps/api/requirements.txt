@@ -1,0 +1,29 @@
+# Kinnatic Outreach — API dependencies
+# Install with:  pip install -r requirements.txt
+#
+# Deliberately absent: any ESP SDK (resend / sendgrid / boto3-ses / mailgun).
+# Mail leaves this app through the Gmail API only, via httpx + google-auth.
+
+fastapi>=0.141.1,<1
+uvicorn[standard]>=0.54.0,<1
+python-multipart>=0.0.32          # required by FastAPI for CSV UploadFile
+
+sqlalchemy>=2.0.52,<3
+psycopg[binary]>=3.3.6,<4
+
+pydantic>=2.13.5,<3
+pydantic-settings>=2.15.0,<3
+python-dotenv>=1.2.3,<2
+
+# Gmail REST, the OAuth token exchange, and ZeroBounce all go through httpx.
+# No google-api-python-client and no google-auth: refreshing an access token is a
+# single POST, and google-auth's transport would drag in `requests` as well.
+httpx>=0.28.1,<1
+
+cryptography>=50.0.1              # AES-GCM encryption of OAuth tokens at rest
+itsdangerous>=2.2.0,<3            # signed session cookie
+dnspython>=2.8.0,<3               # MX lookups; never used to open an SMTP connection
+
+# dev / test
+pytest>=9.1.1
+ruff>=0.16.9

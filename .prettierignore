@@ -1,0 +1,8 @@
+/dist
+/build
+/coverage
+/node_modules
+package-lock.json
+/.nx/cache
+/.nx/workspace-data
+apps/api

@@ -1,0 +1,24 @@
+{
+  "name": "@kinnatic/outreach",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": ["apps/web"],
+  "scripts": {
+    "dev": "nx run-many -t dev --parallel=2",
+    "dev:api": "nx dev api",
+    "dev:web": "nx dev web",
+    "build": "nx build web",
+    "seed": "nx seed api",
+    "test": "nx test api",
+    "lint": "nx run-many -t lint",
+    "typecheck": "nx typecheck web",
+    "db:up": "nx db-up api",
+    "db:down": "nx db-down api",
+    "reconcile": "nx reconcile api",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "nx": "23.2.1",
+    "prettier": "~3.6.2"
+  }
+}

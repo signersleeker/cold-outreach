@@ -1,0 +1,26 @@
+# Postgres for Kinnatic Outreach.
+#
+# Host port is 5433, not 5432: this machine already runs a system Postgres on
+# 5432. Keeping them separate means `docker compose down -v` can never destroy
+# anything outside this project.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: outreach-postgres
+    environment:
+      POSTGRES_USER: outreach
+      POSTGRES_PASSWORD: outreach
+      POSTGRES_DB: outreach
+    ports:
+      - '5433:5432'
+    volumes:
+      - outreach_pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U outreach -d outreach']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  outreach_pgdata:
