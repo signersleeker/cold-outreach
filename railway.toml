@@ -1,0 +1,11 @@
+# Railpack's runtime image takes /mise/installs from the package step, before
+# the build command runs. `pip install` writes into that prefix, and those
+# site-packages are dropped. A venv under /app is part of the build output
+# that is copied, and its interpreter still points at the Mise Python.
+
+[build]
+builder = "RAILPACK"
+buildCommand = "npm ci && npm run build && python -m venv /app/.venv && /app/.venv/bin/pip install -r apps/api/requirements.txt"
+
+[deploy]
+startCommand = "cd apps/api && exec /app/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
