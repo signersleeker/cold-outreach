@@ -72,7 +72,9 @@ export const useContacts = (params: ContactsQuery) =>
     queryFn: () => api.contacts(params),
   });
 
-export const useContactStats = (params: { q?: string; companyId?: string } = {}) =>
+export const useContactStats = (
+  params: Pick<ContactsQuery, 'q' | 'companyId' | 'industry'> = {},
+) =>
   useQuery({
     queryKey: queryKeys.contactStats(params),
     queryFn: () => api.contactStats(params),

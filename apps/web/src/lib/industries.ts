@@ -19,3 +19,6 @@ export const INDUSTRIES = [
   'Mining & Metals',
   'Utilities',
 ] as const;
+
+/** Query value for contacts whose company has no industry. Matches UNSET_INDUSTRY. */
+export const UNSET_INDUSTRY = 'none';

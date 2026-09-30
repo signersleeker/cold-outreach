@@ -4,6 +4,7 @@ export interface ContactsQuery {
   q?: string;
   status?: ContactFilter;
   companyId?: string;
+  industry?: string;
   limit?: number;
   offset?: number;
 }
@@ -20,7 +21,7 @@ export const queryKeys = {
   sendActivity: (days: number) => ['dashboard', 'activity', days] as const,
   contacts: (params: ContactsQuery) => ['contacts', params] as const,
   // Under the 'contacts' prefix so the existing invalidations already cover it.
-  contactStats: (params: { q?: string; companyId?: string }) =>
+  contactStats: (params: Pick<ContactsQuery, 'q' | 'companyId' | 'industry'>) =>
     ['contacts', 'stats', params] as const,
   contact: (id: string) => ['contacts', id] as const,
   companies: (params: CompaniesQuery) => ['companies', params] as const,

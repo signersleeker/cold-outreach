@@ -343,6 +343,7 @@ export const api = {
     q?: string;
     status?: ContactFilter;
     companyId?: string;
+    industry?: string;
     limit?: number;
     offset?: number;
   }) => {
@@ -350,16 +351,18 @@ export const api = {
     if (params.q) query.set('q', params.q);
     if (params.status && params.status !== 'all') query.set('status', params.status);
     if (params.companyId) query.set('companyId', params.companyId);
+    if (params.industry) query.set('industry', params.industry);
     query.set('limit', String(params.limit ?? 50));
     query.set('offset', String(params.offset ?? 0));
     return unwrapList<Contact[], { total: number; limit: number; offset: number }>(
       `/api/v1/contacts?${query}`,
     );
   },
-  contactStats: (params: { q?: string; companyId?: string } = {}) => {
+  contactStats: (params: { q?: string; companyId?: string; industry?: string } = {}) => {
     const query = new URLSearchParams();
     if (params.q) query.set('q', params.q);
     if (params.companyId) query.set('companyId', params.companyId);
+    if (params.industry) query.set('industry', params.industry);
     return unwrap<ContactStats>(`/api/v1/contacts/stats?${query}`);
   },
   contact: (id: string) => unwrap<Contact>(`/api/v1/contacts/${id}`),

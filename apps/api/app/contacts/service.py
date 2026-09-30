@@ -142,10 +142,33 @@ def _apply_filter(query, status: str):  # noqa: ANN001 - SQLAlchemy Select gener
     return query
 
 
-def _apply_scope(query, *, q: str, company_id: uuid.UUID | None):  # noqa: ANN001, ANN202
-    """The company/search narrowing that applies before the status filter."""
+def _apply_scope(  # noqa: ANN001, ANN202
+    query,
+    *,
+    q: str,
+    company_id: uuid.UUID | None,
+    industry: str | None = None,
+):
+    """Company, search, and industry narrowing that applies before the status filter.
+
+    `industry` is None when that filter is off, '' for contacts with no industry
+    (no company, or a company whose industry is blank), or a canonical name.
+    """
     if company_id is not None:
         query = query.where(Contact.company_id == company_id)
+
+    if industry is not None:
+        if industry == "":
+            query = query.where(
+                or_(
+                    Contact.company_id.is_(None),
+                    Contact.company_id.in_(select(Company.id).where(Company.industry == "")),
+                )
+            )
+        else:
+            query = query.where(
+                Contact.company_id.in_(select(Company.id).where(Company.industry == industry))
+            )
 
     if q.strip():
         pattern = f"%{q.strip().lower()}%"
@@ -163,7 +186,13 @@ def _apply_scope(query, *, q: str, company_id: uuid.UUID | None):  # noqa: ANN00
     return query
 
 
-def stats(db: Session, *, q: str = "", company_id: uuid.UUID | None = None) -> dict[str, int]:
+def stats(
+    db: Session,
+    *,
+    q: str = "",
+    company_id: uuid.UUID | None = None,
+    industry: str | None = None,
+) -> dict[str, int]:
     """Row counts per status filter, under the same scope the list is using.
 
     Every count goes through `_apply_filter`, the same function the list query
@@ -172,7 +201,12 @@ def stats(db: Session, *, q: str = "", company_id: uuid.UUID | None = None) -> d
     composition bar, which is a different question from `ready` (that one also
     requires unsent and unsuppressed).
     """
-    base = _apply_scope(select(func.count()).select_from(Contact), q=q, company_id=company_id)
+    base = _apply_scope(
+        select(func.count()).select_from(Contact),
+        q=q,
+        company_id=company_id,
+        industry=industry,
+    )
 
     counts = {
         name: db.scalar(_apply_filter(base, name)) or 0
@@ -200,14 +234,21 @@ def search(
     q: str = "",
     status: str = "all",
     company_id: uuid.UUID | None = None,
+    industry: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Contact], int]:
     query = _apply_scope(
-        select(Contact).options(joinedload(Contact.company_ref)), q=q, company_id=company_id
+        select(Contact).options(joinedload(Contact.company_ref)),
+        q=q,
+        company_id=company_id,
+        industry=industry,
     )
     count_query = _apply_scope(
-        select(func.count()).select_from(Contact), q=q, company_id=company_id
+        select(func.count()).select_from(Contact),
+        q=q,
+        company_id=company_id,
+        industry=industry,
     )
 
     query = _apply_filter(query, status)

@@ -13,6 +13,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.companies import service as companies_service
 from app.contacts import service as contacts_service
 from app.dashboard import service as dashboard_service
 from app.sends.constants import (
@@ -120,6 +121,61 @@ def test_stats_counts_match_the_list_filters(db: Session, make_contact) -> None:
     assert stats["ready"] == 1, "valid, never sent, not suppressed"
     assert stats["sent"] == 1
     assert stats["suppressed"] == 1
+
+
+def test_industry_filter_scopes_the_list_and_the_stats(db: Session, make_contact) -> None:
+    insurance = make_contact(email="a@ins.example", company="Northwind Mutual")
+    make_contact(email="b@mine.example", company="Southgate Group")
+    make_contact(email="c@blank.example", company="Blank Co")
+    make_contact(email="d@solo.example", company="")
+
+    assert insurance.company_id is not None
+    companies_service.update(db, insurance.company_id, industry="insurance")
+    mining = contacts_service.by_email(db, "b@mine.example")
+    assert mining is not None and mining.company_id is not None
+    companies_service.update(db, mining.company_id, industry="Mining & Metals")
+
+    rows, total = contacts_service.search(db, industry="Insurance")
+    assert total == 1
+    assert [row.email for row in rows] == ["a@ins.example"]
+
+    stats = contacts_service.stats(db, industry="Insurance")
+    assert stats["all"] == 1
+    assert stats["ready"] == 1
+    _, listed = contacts_service.search(db, industry="Insurance", status="ready")
+    assert listed == stats["ready"]
+
+    unset, unset_total = contacts_service.search(db, industry="")
+    assert unset_total == 2
+    assert {row.email for row in unset} == {"c@blank.example", "d@solo.example"}
+    assert contacts_service.stats(db, industry="")["all"] == 2
+    assert contacts_service.stats(db)["all"] == 4
+
+
+def test_industry_filter_route(client, db: Session, make_contact) -> None:
+    contact = make_contact(email="a@ins.example", company="Northwind Mutual")
+    make_contact(email="b@other.example", company="Other Co")
+
+    assert contact.company_id is not None
+    companies_service.update(db, contact.company_id, industry="Insurance")
+
+    response = client.get("/api/v1/contacts", params={"industry": "insurance"})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["meta"]["total"] == 1
+    assert body["data"][0]["companyIndustry"] == "Insurance"
+
+    stats = client.get("/api/v1/contacts/stats", params={"industry": "Insurance"})
+    assert stats.status_code == 200, stats.text
+    assert stats.json()["data"]["all"] == 1
+
+    unset = client.get("/api/v1/contacts", params={"industry": "none"})
+    assert unset.status_code == 200, unset.text
+    assert unset.json()["meta"]["total"] == 1
+    assert unset.json()["data"][0]["email"] == "b@other.example"
+
+    unknown = client.get("/api/v1/contacts", params={"industry": "Space Mining"})
+    assert unknown.status_code == 400
 
 
 def test_stats_respects_search_and_company_scope(db: Session, make_contact) -> None:

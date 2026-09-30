@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Query, Response, UploadFile
 
+from app.companies.constants import resolve_industry_filter
 from app.constants import MAX_CSV_BYTES
 from app.contacts import service
 from app.contacts.constants import CONTACT_FILTERS
@@ -33,13 +34,20 @@ def list_contacts(
     q: str = Query(default=""),
     status: str = Query(default="all"),
     company_id: uuid.UUID | None = Query(default=None, alias="companyId"),
+    industry: str = Query(default=""),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> Response:
     if status not in CONTACT_FILTERS:
         raise AppError(400, f"unknown filter {status!r}")
     rows, total = service.search(
-        db, q=q, status=status, company_id=company_id, limit=limit, offset=offset
+        db,
+        q=q,
+        status=status,
+        company_id=company_id,
+        industry=resolve_industry_filter(industry),
+        limit=limit,
+        offset=offset,
     )
     return list_body(
         [ContactDTO.model_validate(row) for row in rows],
@@ -54,8 +62,18 @@ def contact_stats(
     db: DbSession,
     q: str = Query(default=""),
     company_id: uuid.UUID | None = Query(default=None, alias="companyId"),
+    industry: str = Query(default=""),
 ) -> Response:
-    return data_body(ContactStatsDTO(**service.stats(db, q=q, company_id=company_id)))
+    return data_body(
+        ContactStatsDTO(
+            **service.stats(
+                db,
+                q=q,
+                company_id=company_id,
+                industry=resolve_industry_filter(industry),
+            )
+        )
+    )
 
 
 @router.post("/contacts")

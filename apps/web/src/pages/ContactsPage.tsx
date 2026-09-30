@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { ListCompositionBar } from '@/components/charts/ListCompositionBar';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
+import { IndustryFilter } from '@/components/IndustrySelect';
 import { NewContactDialog } from '@/components/NewContactDialog';
 import { SendModal, ValidationBadge } from '@/components/SendModal';
 import { Button } from '@/components/ui/button';
@@ -352,6 +353,7 @@ function Metric({
 export function ContactsPage() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<ContactFilter>('all');
+  const [industry, setIndustry] = useState('');
   const [offset, setOffset] = useState(0);
   const [sendTo, setSendTo] = useState<Contact | null>(null);
   const [suppressTarget, setSuppressTarget] = useState<Contact | null>(null);
@@ -359,12 +361,13 @@ export function ContactsPage() {
   const { data, isLoading, error } = useContacts({
     q: query,
     status,
+    industry,
     limit: PAGE_SIZE,
     offset,
   });
-  // Scoped by the search but not by the status filter — the chips need to show
-  // what you'd get by switching to them, not what the current filter shows.
-  const { data: stats } = useContactStats({ q: query });
+  // Scoped by the search and industry, but not by the status filter — the chips
+  // need to show what you'd get by switching to them, not what the current chip shows.
+  const { data: stats } = useContactStats({ q: query, industry });
   const contacts = data?.data ?? [];
   const total = data?.meta.total ?? 0;
 
@@ -421,6 +424,13 @@ export function ContactsPage() {
               setOffset(0);
             }}
           />
+          <IndustryFilter
+            value={industry}
+            onValueChange={(next) => {
+              setIndustry(next);
+              setOffset(0);
+            }}
+          />
           <Segmented
             aria-label="Filter contacts by status"
             value={status}
@@ -439,7 +449,7 @@ export function ContactsPage() {
 
         <Card className="overflow-hidden">
           {isLoading ? (
-            <TableSkeleton cols={7} />
+            <TableSkeleton cols={8} />
           ) : contacts.length === 0 ? (
             <EmptyState
               title="No contacts match"
@@ -453,6 +463,7 @@ export function ContactsPage() {
                     <Th>Email</Th>
                     <Th>Name</Th>
                     <Th>Company</Th>
+                    <Th>Industry</Th>
                     <Th>Title</Th>
                     <Th>Status</Th>
                     <Th>Last sent</Th>
@@ -480,6 +491,7 @@ export function ContactsPage() {
                           '—'
                         )}
                       </Td>
+                      <Td className="whitespace-nowrap">{contact.companyIndustry || '—'}</Td>
                       <Td>{contact.title || '—'}</Td>
                       <Td>
                         <ValidationBadge contact={contact} />
