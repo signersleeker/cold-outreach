@@ -7,6 +7,7 @@
   "targets": {
     "dev": {
       "executor": "nx:run-commands",
+      "dependsOn": ["db-up"],
       "options": {
         "command": "sh -c 'PATH=\"$PWD/.venv/bin:$PATH\" exec uvicorn app.main:app --host 0.0.0.0 --port \"${PORT:-8000}\" --reload'",
         "cwd": "{projectRoot}"
@@ -70,7 +71,8 @@
     },
     "db-up": {
       "executor": "nx:run-commands",
-      "options": { "command": "docker compose up -d", "cwd": "{projectRoot}" }
+      "cache": false,
+      "options": { "command": "docker compose up -d --wait", "cwd": "{projectRoot}" }
     },
     "db-down": {
       "executor": "nx:run-commands",
