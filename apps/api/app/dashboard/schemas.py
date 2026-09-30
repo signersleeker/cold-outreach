@@ -11,6 +11,27 @@ class LastSendDTO(CamelModel):
     sent_at: dt.datetime | None
 
 
+class ActivityDayDTO(CamelModel):
+    """One Brisbane calendar day of send activity.
+
+    `sent` counts everything that actually left the mailbox that day, whatever
+    the eventual outcome, so it lines up with the daily cap. `bounced` and
+    `stopped` are subsets of it, not separate columns.
+    """
+
+    date: dt.date
+    sent: int
+    bounced: int
+    stopped: int
+
+
+class ActivityDTO(CamelModel):
+    days: list[ActivityDayDTO]
+    daily_cap: int
+    total_sent: int
+    busiest_day: int
+
+
 class DashboardDTO(CamelModel):
     sends_today: int
     daily_cap: int

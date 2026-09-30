@@ -1,0 +1,244 @@
+/* ===================================================================
+   Taddar — Tailwind CSS v4 theme
+   Usage: in your main CSS file, replace `@import "tailwindcss";` with
+          `@import "./taddar.css";`  (this file imports Tailwind itself)
+   Dark mode: add class="dark" to <html>.
+   Classes you get: bg-uv-700, text-coral-700, bg-butter-300, text-ink-600 …
+                    bg-primary, text-primary-foreground, bg-signal, border-border,
+                    text-display / text-h1 … text-caption, rounded-bubble, shadow-card
+   =================================================================== */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Brand scales. Anchors: uv-700 #3423A6 · coral-500 #FF6B5B · butter-300 #FFD66B · ink-950 #1A1633 · ink-50 #F5F4FB */
+  --color-uv-50: #F5F6FF;
+  --color-uv-100: #E6EAFF;
+  --color-uv-200: #CDD5FF;
+  --color-uv-300: #AEB8FF;
+  --color-uv-400: #8C96ED;
+  --color-uv-500: #6C73DA;
+  --color-uv-600: #4F4FC7;
+  --color-uv-700: #3423A6;
+  --color-uv-800: #271B81;
+  --color-uv-900: #1B0B67;
+  --color-uv-950: #10014B;
+  --color-coral-50: #FFF4F2;
+  --color-coral-100: #FFE7E3;
+  --color-coral-200: #FED0C9;
+  --color-coral-300: #FEB3A8;
+  --color-coral-400: #FC9384;
+  --color-coral-500: #FF6B5B;
+  --color-coral-600: #DD5749;
+  --color-coral-700: #B8473C;
+  --color-coral-800: #91362D;
+  --color-coral-900: #6F2820;
+  --color-coral-950: #481611;
+  --color-butter-50: #FFFAED;
+  --color-butter-100: #FFF3D5;
+  --color-butter-200: #FFE6A7;
+  --color-butter-300: #FFD66B;
+  --color-butter-400: #EEC65C;
+  --color-butter-500: #D7B353;
+  --color-butter-600: #B39545;
+  --color-butter-700: #8C7436;
+  --color-butter-800: #6B5929;
+  --color-butter-900: #4E411D;
+  --color-butter-950: #312811;
+  --color-ink-50: #F5F4FB;
+  --color-ink-100: #EAEAF4;
+  --color-ink-200: #DAD9E5;
+  --color-ink-300: #C0BFCC;
+  --color-ink-400: #9D9CAC;
+  --color-ink-500: #797889;
+  --color-ink-600: #5C5C6F;
+  --color-ink-700: #474559;
+  --color-ink-800: #343347;
+  --color-ink-900: #252438;
+  --color-ink-950: #1A1633;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Type scale */
+  --text-display: 4rem;
+  --text-display--line-height: 4.25rem;
+  --text-display--letter-spacing: -0.03em;
+  --text-display--font-weight: 700;
+  --text-h1: 3rem;
+  --text-h1--line-height: 3.375rem;
+  --text-h1--letter-spacing: -0.025em;
+  --text-h1--font-weight: 700;
+  --text-h2: 2.25rem;
+  --text-h2--line-height: 2.625rem;
+  --text-h2--letter-spacing: -0.02em;
+  --text-h2--font-weight: 600;
+  --text-h3: 1.5rem;
+  --text-h3--line-height: 2rem;
+  --text-h3--letter-spacing: -0.015em;
+  --text-h3--font-weight: 600;
+  --text-h4: 1.25rem;
+  --text-h4--line-height: 1.75rem;
+  --text-h4--letter-spacing: -0.01em;
+  --text-h4--font-weight: 600;
+  --text-body-lg: 1.125rem;
+  --text-body-lg--line-height: 1.75rem;
+  --text-body-lg--letter-spacing: 0em;
+  --text-body-lg--font-weight: 400;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5rem;
+  --text-body--letter-spacing: 0em;
+  --text-body--font-weight: 400;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.25rem;
+  --text-small--letter-spacing: 0em;
+  --text-small--font-weight: 400;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-caption--letter-spacing: 0.01em;
+  --text-caption--font-weight: 500;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-bubble: 24%;
+
+  --shadow-soft: 0 1px 2px 0 rgb(26 22 51 / 0.06), 0 1px 3px 0 rgb(26 22 51 / 0.04);
+  --shadow-card: 0 4px 12px -2px rgb(52 35 166 / 0.10), 0 2px 4px -2px rgb(26 22 51 / 0.06);
+  --shadow-lift: 0 16px 40px -12px rgb(52 35 166 / 0.28);
+}
+
+/* Semantic colours switch with the theme. shadcn/ui-compatible names, plus
+   `signal` (coral CTA / notification) and `highlight` (butter badges). */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-signal: var(--signal);
+  --color-signal-hover: var(--signal-hover);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-signal-text: var(--signal-text);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-link: var(--link);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+:root {
+  --background: #FFFFFF;
+  --foreground: #1A1633;
+  --surface: #F5F4FB;
+  --surface-foreground: #1A1633;
+  --card: #FFFFFF;
+  --card-foreground: #1A1633;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1633;
+  --primary: #3423A6;
+  --primary-hover: #271B81;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EAEAF4;
+  --secondary-foreground: #1A1633;
+  --muted: #F5F4FB;
+  --muted-foreground: #5C5C6F;
+  --accent: #F5F6FF;
+  --accent-foreground: #271B81;
+  --signal: #FF6B5B;
+  --signal-hover: #FC9384;
+  --signal-foreground: #1A1633;
+  --signal-text: #B8473C;
+  --highlight: #FFD66B;
+  --highlight-foreground: #1A1633;
+  --link: #3423A6;
+  --destructive: #B42318;
+  --destructive-foreground: #FFFFFF;
+  --success: #15803D;
+  --warning: #B45309;
+  --border: #DAD9E5;
+  --input: #DAD9E5;
+  --ring: #6C73DA;
+}
+
+.dark {
+  --background: #1A1633;
+  --foreground: #F5F4FB;
+  --surface: #252438;
+  --surface-foreground: #F5F4FB;
+  --card: #252438;
+  --card-foreground: #F5F4FB;
+  --popover: #252438;
+  --popover-foreground: #F5F4FB;
+  --primary: #4F4FC7;
+  --primary-hover: #3423A6;
+  --primary-foreground: #FFFFFF;
+  --secondary: #343347;
+  --secondary-foreground: #F5F4FB;
+  --muted: #252438;
+  --muted-foreground: #C0BFCC;
+  --accent: #1B0B67;
+  --accent-foreground: #E6EAFF;
+  --signal: #FF6B5B;
+  --signal-hover: #FC9384;
+  --signal-foreground: #1A1633;
+  --signal-text: #FC9384;
+  --highlight: #FFD66B;
+  --highlight-foreground: #1A1633;
+  --link: #AEB8FF;
+  --destructive: #B42318;
+  --destructive-foreground: #FFFFFF;
+  --success: #16A34A;
+  --warning: #F59E0B;
+  --border: #343347;
+  --input: #343347;
+  --ring: #8C96ED;
+}
+
+@layer base {
+  html { @apply bg-background text-foreground font-sans antialiased; }
+  * { @apply border-border; }
+  ::selection { background: var(--color-butter-300); color: var(--color-ink-950); }
+}
+
+/* Brand components. Use as classes: btn-primary, btn-signal, btn-ghost, badge-highlight */
+@utility btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  height: 2.75rem; padding-inline: 1.25rem; border-radius: 9999px;
+  font-weight: 600; font-size: 0.9375rem; letter-spacing: -0.005em;
+  transition: background-color 150ms, box-shadow 150ms, transform 150ms;
+  &:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+  &:active { transform: translateY(1px); }
+}
+@utility btn-primary {
+  @apply btn bg-primary text-primary-foreground shadow-card hover:bg-primary-hover;
+}
+@utility btn-signal {
+  @apply btn bg-signal text-signal-foreground hover:bg-signal-hover;
+}
+@utility btn-ghost {
+  @apply btn bg-transparent text-foreground border border-border hover:bg-accent hover:text-accent-foreground;
+}
+@utility badge-highlight {
+  @apply inline-flex items-center gap-1 rounded-full bg-highlight px-2.5 py-0.5 text-caption text-highlight-foreground;
+}

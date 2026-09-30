@@ -13,6 +13,7 @@ from app.contacts.schemas import (
     ContactCreateRequest,
     ContactDTO,
     ContactPatchRequest,
+    ContactStatsDTO,
     ImportPreviewDTO,
     ImportSummaryDTO,
     SuppressContactRequest,
@@ -44,6 +45,17 @@ def list_contacts(
         [ContactDTO.model_validate(row) for row in rows],
         {"total": total, "limit": limit, "offset": offset},
     )
+
+
+# Declared before /contacts/{contact_id} — FastAPI matches in declaration order,
+# so the dynamic route would otherwise swallow "stats" as a contact id.
+@router.get("/contacts/stats")
+def contact_stats(
+    db: DbSession,
+    q: str = Query(default=""),
+    company_id: uuid.UUID | None = Query(default=None, alias="companyId"),
+) -> Response:
+    return data_body(ContactStatsDTO(**service.stats(db, q=q, company_id=company_id)))
 
 
 @router.post("/contacts")

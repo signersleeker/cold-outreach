@@ -20,14 +20,14 @@ export function DialogContent({
 }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-ink-950/50" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 flex max-h-[90vh] w-[min(46rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-[var(--radius-lg)] border border-border bg-card shadow-lg',
+          'fixed top-1/2 left-1/2 z-50 flex max-h-[90vh] w-[min(46rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-[var(--radius-lg)] border border-border bg-card shadow-lift',
           className,
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b px-4 py-3">
+        <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
           <div>
             <DialogPrimitive.Title className="text-sm font-semibold">
               {title}

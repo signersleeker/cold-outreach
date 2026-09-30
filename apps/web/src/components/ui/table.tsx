@@ -14,7 +14,7 @@ export function Th({ className, ...props }: React.ComponentProps<'th'>) {
   return (
     <th
       className={cn(
-        'border-b bg-muted/60 px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground uppercase whitespace-nowrap',
+        'border-b border-border bg-surface px-3 py-2.5 text-left font-mono text-caption font-medium tracking-wider text-muted-foreground uppercase whitespace-nowrap',
         className,
       )}
       {...props}
@@ -23,9 +23,19 @@ export function Th({ className, ...props }: React.ComponentProps<'th'>) {
 }
 
 export function Td({ className, ...props }: React.ComponentProps<'td'>) {
-  return <td className={cn('border-b px-3 py-2 align-middle', className)} {...props} />;
+  return (
+    <td
+      className={cn('border-b border-border px-3 py-2.5 align-middle', className)}
+      {...props}
+    />
+  );
 }
 
 export function Tr({ className, ...props }: React.ComponentProps<'tr'>) {
-  return <tr className={cn('hover:bg-accent/60', className)} {...props} />;
+  return (
+    <tr
+      className={cn('transition-colors last:[&>td]:border-b-0 hover:bg-accent/70', className)}
+      {...props}
+    />
+  );
 }

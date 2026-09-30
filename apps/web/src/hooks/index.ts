@@ -45,6 +45,13 @@ export const useDashboard = () =>
     refetchInterval: 30_000,
   });
 
+export const useSendActivity = (days = 30) =>
+  useQuery({
+    queryKey: queryKeys.sendActivity(days),
+    queryFn: () => api.sendActivity(days),
+    refetchInterval: 60_000,
+  });
+
 export function useSyncInbox() {
   const client = useQueryClient();
   return useMutation({
@@ -62,6 +69,15 @@ export const useContacts = (params: ContactsQuery) =>
   useQuery({
     queryKey: queryKeys.contacts(params),
     queryFn: () => api.contacts(params),
+  });
+
+export const useContactStats = (params: { q?: string; companyId?: string } = {}) =>
+  useQuery({
+    queryKey: queryKeys.contactStats(params),
+    queryFn: () => api.contactStats(params),
+    // Keep the previous counts on screen while a new search settles, so the
+    // chips don't flash empty on every keystroke.
+    placeholderData: (previous) => previous,
   });
 
 export const useContact = (id: string) =>

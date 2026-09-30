@@ -1,13 +1,15 @@
 import { ArrowLeft, RefreshCw, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ErrorBanner, PageHeader } from '@/components/AppLayout';
+import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
 import { SendModal, ValidationBadge } from '@/components/SendModal';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
 import { Card, CardBody, CardHeader, CardTitle, EmptyState } from '@/components/ui/card';
 import { Field, Input, Textarea } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
 import { useContact, useRevalidateContact, useSendHistory, useUpdateContact } from '@/hooks';
 import type { Contact } from '@/lib/api';
@@ -39,7 +41,25 @@ export function ContactDetailPage() {
     return (
       <>
         <PageHeader title="Contact" />
-        <p className="px-6 py-4 text-xs text-muted-foreground">Loading…</p>
+        <PageBody className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          <Card className="p-4">
+            <Skeleton className="h-3.5 w-24" />
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-8" />
+              ))}
+            </div>
+            <Skeleton className="mt-3 h-16" />
+          </Card>
+          <Card className="h-fit p-4">
+            <Skeleton className="h-3.5 w-20" />
+            <div className="mt-4 space-y-2.5">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-3" />
+              ))}
+            </div>
+          </Card>
+        </PageBody>
       </>
     );
   }
@@ -47,9 +67,9 @@ export function ContactDetailPage() {
     return (
       <>
         <PageHeader title="Contact" />
-        <div className="px-6 py-4">
+        <PageBody>
           <ErrorBanner error={error} />
-        </div>
+        </PageBody>
       </>
     );
   }
@@ -86,7 +106,7 @@ export function ContactDetailPage() {
         }
       />
 
-      <div className="grid gap-4 px-6 py-4 lg:grid-cols-[2fr_1fr]">
+      <PageBody className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-4">
           <Card>
             <CardHeader>
@@ -124,7 +144,7 @@ export function ContactDetailPage() {
                   </Field>
                 ))}
                 <Field label="Company">
-                  <div className="flex h-8 items-center rounded-[var(--radius-sm)] border border-input bg-muted/40 px-2.5 text-sm">
+                  <div className="flex h-8 items-center rounded-[var(--radius-md)] border border-input bg-surface px-2.5 text-sm">
                     {contact.companyId && contact.company ? (
                       <Link
                         to={`/companies/${contact.companyId}`}
@@ -229,26 +249,22 @@ export function ContactDetailPage() {
               <span>{formatDateTime(contact.createdAt)}</span>
             </div>
             {contact.suppressed ? (
-              <div className="mt-2 rounded-[var(--radius-sm)] bg-danger-subtle px-2.5 py-2 text-danger">
-                <p className="font-semibold">Suppressed</p>
+              <Callout tone="danger" title="Suppressed" className="mt-1">
                 <p>
                   {SUPPRESSION_REASON_LABELS[contact.suppressedReason] ??
                     contact.suppressedReason}{' '}
                   · {formatDateTime(contact.suppressedAt)}
                 </p>
-                <p className="mt-1">
-                  Remove it from the{' '}
-                  <Link to="/suppressions" className="underline">
-                    suppressions list
-                  </Link>{' '}
-                  if this was a mistake.
+                <p>
+                  Remove it from the <Link to="/suppressions">suppressions list</Link> if this was
+                  a mistake.
                 </p>
-              </div>
+              </Callout>
             ) : null}
             <ErrorBanner error={revalidate.error} />
           </CardBody>
         </Card>
-      </div>
+      </PageBody>
 
       <SendModal contact={contact} open={sendOpen} onOpenChange={setSendOpen} />
     </>

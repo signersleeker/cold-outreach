@@ -1,6 +1,7 @@
 import type * as React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
+import { TaddarIcon } from '@/components/brand/Logo';
 import { useSession } from '@/hooks';
 import { CompaniesPage } from '@/pages/CompaniesPage';
 import { CompanyDetailPage } from '@/pages/CompanyDetailPage';
@@ -16,7 +17,13 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   const { data, isLoading } = useSession();
 
   if (isLoading) {
-    return <p className="p-6 text-xs text-muted-foreground">Loading…</p>;
+    // Session check is a sub-second round trip, so this is a held brand beat
+    // rather than a skeleton of a layout we may never render.
+    return (
+      <div className="grid min-h-screen place-items-center bg-surface">
+        <TaddarIcon className="size-9 animate-pulse" title="Loading Taddar" />
+      </div>
+    );
   }
   if (!data?.authenticated) {
     return <Navigate to="/login" replace />;

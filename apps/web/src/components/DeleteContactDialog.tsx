@@ -73,7 +73,7 @@ export function DeleteContactDialog({
           </p>
 
           {contact.suppressed ? (
-            <p className="rounded-[var(--radius-sm)] bg-muted/60 px-2.5 py-2">
+            <p className="rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2.5">
               This contact is suppressed. <strong>The suppression stays</strong> — it lives on the
               suppression list, keyed by email address, so deleting the contact cannot undo the
               opt-out. Re-importing this address would bring it back already suppressed.
@@ -81,7 +81,7 @@ export function DeleteContactDialog({
           ) : null}
 
           {needsForce ? (
-            <div className="space-y-2 rounded-[var(--radius-sm)] border border-danger/30 bg-danger-subtle px-2.5 py-2 text-danger">
+            <div className="space-y-2 rounded-[var(--radius-md)] border border-danger/25 bg-danger-subtle px-3 py-2.5 text-danger">
               <p className="font-semibold">You have already emailed this person.</p>
               <p>
                 Deleting also deletes the record of what was sent and when. If you only want to

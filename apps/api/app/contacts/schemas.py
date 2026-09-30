@@ -8,6 +8,20 @@ from pydantic import Field
 from app.lib.schemas import CamelModel
 
 
+class ContactStatsDTO(CamelModel):
+    """Counts behind the Contacts header. Field names mirror the status filters."""
+
+    all: int
+    ready: int
+    risky: int
+    invalid: int
+    pending: int
+    sent: int
+    suppressed: int
+    validation_valid: int
+    validation_unverified: int
+
+
 class ContactDTO(CamelModel):
     id: uuid.UUID
     email: str

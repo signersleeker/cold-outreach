@@ -8,29 +8,23 @@ import { cn } from '@/lib/utils';
 import { ErrorBanner } from './AppLayout';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { Callout } from './ui/callout';
 import { Checkbox } from './ui/checkbox';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from './ui/dialog';
 import { Label } from './ui/input';
+import { Segmented } from './ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 function GateList({ findings, tone }: { findings: GateFinding[]; tone: 'danger' | 'warning' }) {
   if (findings.length === 0) return null;
   const Icon = tone === 'danger' ? Ban : AlertTriangle;
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-1.5">
       {findings.map((finding) => (
-        <li
-          key={finding.code}
-          className={
-            tone === 'danger'
-              ? 'flex items-start gap-2 rounded-[var(--radius-sm)] bg-danger-subtle px-2.5 py-1.5 text-xs text-danger'
-              : 'flex items-start gap-2 rounded-[var(--radius-sm)] bg-warning-subtle px-2.5 py-1.5 text-xs text-warning'
-          }
-        >
-          <Icon className="mt-px size-3.5 shrink-0" />
-          <span>
+        <li key={finding.code}>
+          <Callout tone={tone} icon={Icon} className="py-2">
             <strong className="font-semibold">{gateLabel(finding.code)}</strong> — {finding.message}
-          </span>
+          </Callout>
         </li>
       ))}
     </ul>
@@ -125,25 +119,18 @@ export function SendModal({
             </p>
           ) : null}
 
-          <div className="flex gap-1">
-            <Button
-              size="sm"
-              variant={mode === 'template' ? 'default' : 'outline'}
-              onClick={() => setMode('template')}
-            >
-              Template
-            </Button>
-            <Button
-              size="sm"
-              variant={mode === 'group' ? 'default' : 'outline'}
-              onClick={() => {
-                setMode('group');
-                if (!groupId && groups[0]) setGroupId(groups[0].id);
-              }}
-            >
-              Group
-            </Button>
-          </div>
+          <Segmented
+            aria-label="Pick from a single template or a group"
+            value={mode}
+            onChange={(next) => {
+              setMode(next);
+              if (next === 'group' && !groupId && groups[0]) setGroupId(groups[0].id);
+            }}
+            options={[
+              { value: 'template', label: 'Template' },
+              { value: 'group', label: 'Group' },
+            ]}
+          />
 
           {mode === 'template' ? (
             <div className="flex flex-col gap-1">
@@ -195,8 +182,10 @@ export function SendModal({
                           type="button"
                           onClick={() => setTemplateId(item.templateId)}
                           className={cn(
-                            'flex w-full items-center gap-2 rounded-[var(--radius-sm)] border px-2.5 py-1.5 text-left text-sm',
-                            active ? 'border-primary bg-accent' : 'hover:bg-accent/60',
+                            'flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-2.5 py-2 text-left text-sm transition-colors',
+                            active
+                              ? 'border-primary bg-accent font-medium text-accent-foreground'
+                              : 'border-border hover:bg-surface',
                           )}
                         >
                           <span className="w-5 font-mono text-xs text-muted-foreground">{index + 1}</span>
@@ -222,10 +211,10 @@ export function SendModal({
           {selectedTemplate?.industry &&
           contact.companyIndustry &&
           selectedTemplate.industry !== contact.companyIndustry ? (
-            <p className="text-xs text-warning">
+            <Callout tone="warning">
               This template is written for {selectedTemplate.industry}. This company is{' '}
               {contact.companyIndustry}.
-            </p>
+            </Callout>
           ) : null}
 
           {preview.isLoading ? (
@@ -239,16 +228,16 @@ export function SendModal({
                 <GateList findings={data.blockers} tone="danger" />
                 <GateList findings={data.warnings} tone="warning" />
                 {data.blockers.length === 0 && data.warnings.length === 0 ? (
-                  <p className="rounded-[var(--radius-sm)] bg-success-subtle px-2.5 py-1.5 text-xs text-success">
+                  <Callout tone="success" className="py-2">
                     All gates pass.
-                  </p>
+                  </Callout>
                 ) : null}
               </div>
 
               {pendingAcks.map((warning) => (
                 <label
                   key={warning.code}
-                  className="flex cursor-pointer items-start gap-2 rounded-[var(--radius-sm)] border border-warning/30 px-2.5 py-2 text-xs"
+                  className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-md)] border border-warning/30 bg-warning-subtle/40 px-3 py-2.5 text-xs"
                 >
                   <Checkbox
                     checked={acknowledged.includes(warning.code)}
@@ -267,17 +256,17 @@ export function SendModal({
                     from {data.fromEmail || '—'}
                   </span>
                 </div>
-                <div className="rounded-[var(--radius-sm)] border bg-muted/40">
-                  <p className="border-b px-3 py-2 font-mono text-xs">
+                <div className="overflow-hidden rounded-[var(--radius-md)] border border-border bg-surface">
+                  <p className="border-b border-border px-3 py-2 font-mono text-xs">
                     <span className="text-muted-foreground">Subject: </span>
                     {data.subject || <em className="text-danger">empty</em>}
                   </p>
-                  <pre className="max-h-40 overflow-y-auto border-b px-3 py-2 font-mono text-xs whitespace-pre-wrap">
+                  <pre className="max-h-40 overflow-y-auto border-b border-border bg-card px-3 py-2.5 font-mono text-xs whitespace-pre-wrap">
                     {data.body}
                   </pre>
                   {data.signatureHtml ? (
                     <div className="space-y-1 px-3 py-2">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <p className="font-mono text-caption tracking-wider text-muted-foreground uppercase">
                         Gmail signature (HTML)
                       </p>
                       <iframe

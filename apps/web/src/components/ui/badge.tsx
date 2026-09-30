@@ -11,6 +11,10 @@ const badgeVariants = cva(
         warning: 'border-transparent bg-warning-subtle text-warning',
         danger: 'border-transparent bg-danger-subtle text-danger',
         muted: 'border-transparent bg-muted text-muted-foreground',
+        // Butter badge from the kit. Brand rule: butter is never a text colour,
+        // so the label is ink via highlight-foreground.
+        highlight: 'border-transparent bg-highlight text-highlight-foreground',
+        accent: 'border-transparent bg-accent text-accent-foreground',
         outline: 'border-border text-foreground',
       },
     },
