@@ -218,7 +218,6 @@ did.
 | `template_missing`       | Choosing a template that still exists                            |
 | `email_invalid`          | Nothing. Invalid addresses are never sent to                     |
 | `contact_suppressed`     | Nothing automatic. Only a manual removal from Suppressions        |
-| `cooldown_active`        | Waiting out `COOLDOWN_DAYS` (default 14)                          |
 | `daily_cap_reached`      | The next calendar day in the operator timezone                   |
 | `unrendered_merge_tags`  | Filling the missing contact field, or using another template      |
 | `subject_empty` / `body_empty` | Fixing the template                                        |
@@ -280,7 +279,7 @@ rather than risking a double send:
 | Gmail outcome                               | Slot                                        |
 | ------------------------------------------- | ------------------------------------------- |
 | Success                                     | Consumed                                    |
-| 4xx — Gmail demonstrably never queued it    | Released, and the cooldown stamp is undone  |
+| 4xx — Gmail demonstrably never queued it    | Released, and `last_sent_at` is undone      |
 | Timeout / 429 / 5xx — it may have gone out  | **Kept.** Check Gmail Sent before retrying  |
 
 If the process dies between the send and the commit, the row stays `queued` and the Dashboard says
@@ -380,7 +379,6 @@ All backend config lives in `apps/api/.env` (see `.env.example`):
 | `GOOGLE_CLIENT_ID` / `_SECRET` | From the Google Cloud OAuth client                                 |
 | `ZEROBOUNCE_API_KEY`           | Optional. Blank → syntax + MX via dnspython                        |
 | `DAILY_CAP`                    | Seeds the settings row only. Server ceiling is 50                  |
-| `COOLDOWN_DAYS`                | Minimum days between emails to the same address (default 14)        |
 | `TZ`                           | Informational only — date maths uses `ZoneInfo` explicitly          |
 
 Rotating `SECRET_KEY` logs you out and makes the stored Gmail token undecryptable; just reconnect

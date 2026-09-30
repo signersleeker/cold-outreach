@@ -14,10 +14,9 @@ Three details make an interruption survivable:
 1. The slot and a durable send_events row exist *before* the irreversible act, so
    a crash mid-send leaves a `queued` row and a consumed slot. The cap is never
    exceeded.
-2. contacts.last_sent_at is written in TX1, not TX2. The FOR UPDATE lock on the
-   contact is released when TX1 commits, so if the timestamp were only written
-   later two concurrent requests could both pass the cooldown gate. Writing it in
-   the reserving transaction makes a double-clicked Send fail the second time.
+2. contacts.last_sent_at is written in TX1, not TX2, so a permanent Gmail failure
+   can roll it back with the reserved slot, and the contact stays marked contacted
+   if the outcome is ambiguous.
 3. The RFC 822 Message-ID is generated and persisted before the call, so
    app/cli/reconcile_sends.py can later discover the true outcome.
 """
@@ -202,7 +201,7 @@ class SendService:
             gmail_message_id = gmail_client.send(encode_raw(message))
         except GmailPermanentError as exc:
             # Gmail rejected it outright, so it was never queued: give the slot
-            # back and undo the cooldown stamp.
+            # back and undo the last_sent_at stamp.
             counters.release_daily_slot(db, day)
             event.status = SEND_STATUS_FAILED
             event.error = str(exc)[:1000]
@@ -212,7 +211,7 @@ class SendService:
             db.commit()
             raise AppError(502, f"Gmail rejected the message: {exc}") from exc
         except GmailAmbiguousError as exc:
-            # It may have gone out. Keep the slot and the cooldown stamp; the
+            # It may have gone out. Keep the slot and the last_sent_at stamp; the
             # reconcile CLI resolves the truth later.
             event.status = SEND_STATUS_FAILED
             event.error = f"ambiguous: {exc}"[:1000]

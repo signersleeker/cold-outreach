@@ -13,7 +13,6 @@ from app.gmail.constants import FORBIDDEN_HEADERS
 from app.lib.clock import DEFAULT_TIMEZONE, local_date
 from app.lib.errors import AppError
 from app.sends.constants import (
-    GATE_COOLDOWN_ACTIVE,
     GATE_DAILY_CAP_REACHED,
     GATE_GMAIL_NOT_CONNECTED,
     GATE_UNRENDERED_MERGE_TAGS,
@@ -140,22 +139,10 @@ def test_send_refuses_when_gmail_is_not_connected(
     assert counters.sends_today(db, local_date(clock, DEFAULT_TIMEZONE)) == 0
 
 
-def test_cooldown_blocks_an_immediate_resend(
+def test_immediate_resend_to_the_same_contact_is_allowed(
     db: Session, contact, template, app_settings, connected_gmail, send_service, gmail
 ) -> None:
     send_service.send(db, contact_id=contact.id, template_id=template.id)
-
-    with pytest.raises(AppError) as exc:
-        send_service.send(db, contact_id=contact.id, template_id=template.id)
-    assert any("Already emailed" in m for m in exc.value.messages)
-    assert len(gmail.sent_raw) == 1
-
-
-def test_resend_is_allowed_once_the_cooldown_expires(
-    db: Session, contact, template, app_settings, connected_gmail, send_service, gmail, clock
-) -> None:
-    send_service.send(db, contact_id=contact.id, template_id=template.id)
-    clock.advance(days=15)
     send_service.send(db, contact_id=contact.id, template_id=template.id)
     assert len(gmail.sent_raw) == 2
 
@@ -263,7 +250,7 @@ def test_the_cap_resets_on_the_next_calendar_day(
 
 
 # ------------------------------------------------------- failure compensation ----
-def test_permanent_gmail_failure_releases_the_slot_and_undoes_the_cooldown(
+def test_permanent_gmail_failure_releases_the_slot_and_undoes_last_sent_at(
     db: Session, contact, template, app_settings, connected_gmail, send_service, gmail, clock
 ) -> None:
     """Gmail rejected it outright, so it was never queued."""
@@ -275,7 +262,7 @@ def test_permanent_gmail_failure_releases_the_slot_and_undoes_the_cooldown(
 
     assert counters.sends_today(db, local_date(clock, DEFAULT_TIMEZONE)) == 0, "slot returned"
     db.refresh(contact)
-    assert contact.last_sent_at is None, "cooldown stamp rolled back"
+    assert contact.last_sent_at is None, "last_sent_at stamp rolled back"
 
     events = send_service.history(db, contact_id=contact.id)
     assert events[0].status == SEND_STATUS_FAILED
@@ -306,20 +293,21 @@ def test_ambiguous_gmail_failure_keeps_the_slot_consumed(
 
     assert counters.sends_today(db, local_date(clock, DEFAULT_TIMEZONE)) == 1, "slot deliberately retained"
     db.refresh(contact)
-    assert contact.last_sent_at is not None, "cooldown deliberately retained"
+    assert contact.last_sent_at is not None, "last_sent_at deliberately retained"
 
 
-def test_ambiguous_failure_leaves_a_retryable_cooldown_block(
+def test_ambiguous_failure_still_allows_a_manual_resend(
     db: Session, contact, template, app_settings, connected_gmail, send_service, gmail
 ) -> None:
-    """The operator must check Gmail rather than blindly retry."""
+    """Without a cooldown gate, the operator can retry after checking Gmail Sent."""
     gmail.fail_ambiguous = True
     with pytest.raises(AppError):
         send_service.send(db, contact_id=contact.id, template_id=template.id)
 
     gmail.fail_ambiguous = False
-    preview = send_service.preview(db, contact_id=contact.id, template_id=template.id)
-    assert GATE_COOLDOWN_ACTIVE in {f.code for f in preview.result.blockers}
+    event = send_service.send(db, contact_id=contact.id, template_id=template.id)
+    assert event.status == SEND_STATUS_SENT
+    assert len(gmail.sent_raw) == 1
 
 
 def test_a_queued_event_is_reported_as_stuck(

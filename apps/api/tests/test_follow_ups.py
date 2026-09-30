@@ -132,23 +132,6 @@ def test_append_step_after_sequence_finished_schedules_from_last_send(
     assert enrollment.steps[2].due_on == local_date(much_later, DEFAULT_TIMEZONE)
 
 
-def test_is_current_due_template(
-    db: Session, make_contact, template, follow_up_template, clock: FrozenClock
-):
-    group = groups_service.create(
-        db, name="Due check", items=[(template.id, 0), (follow_up_template.id, 5)]
-    )
-    contact = make_contact()
-    sequences.enroll(db, contact_id=contact.id, group_id=group.id, clock=clock)
-    today = local_date(clock, DEFAULT_TIMEZONE)
-    assert sequences.is_current_due_template(
-        db, contact_id=contact.id, template_id=template.id, today=today
-    )
-    assert not sequences.is_current_due_template(
-        db, contact_id=contact.id, template_id=follow_up_template.id, today=today
-    )
-
-
 def test_calendar_lists_due_steps(
     db: Session, make_contact, template, follow_up_template, clock: FrozenClock
 ):

@@ -76,29 +76,6 @@ def next_pending_step(enrollment: FollowUpEnrollment) -> FollowUpStep | None:
     return None
 
 
-def current_due_step(enrollment: FollowUpEnrollment, *, today: dt.date) -> FollowUpStep | None:
-    step = next_pending_step(enrollment)
-    if step is None or step.due_on is None:
-        return None
-    if step.due_on > today:
-        return None
-    return step
-
-
-def is_current_due_template(
-    db: Session,
-    *,
-    contact_id: uuid.UUID,
-    template_id: uuid.UUID,
-    today: dt.date,
-) -> bool:
-    enrollment = get_active_for_contact(db, contact_id)
-    if enrollment is None:
-        return False
-    step = current_due_step(enrollment, today=today)
-    return step is not None and step.template_id == template_id
-
-
 def _cancel_enrollment(enrollment: FollowUpEnrollment, *, now: dt.datetime) -> None:
     enrollment.status = ENROLLMENT_CANCELLED
     enrollment.cancelled_at = now

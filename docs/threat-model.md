@@ -104,7 +104,7 @@ named `kinnatic_outreach_session` to avoid colliding with other local projects.
 
 ## 5. Deliverability, and why the limits are the point
 
-One mailbox, ≤20 sends/day, plain text, no tracking, no bulk headers, a 14-day cooldown per address,
+One mailbox, ≤20 sends/day, plain text, no tracking, no bulk headers,
 and immediate suppression on any negative signal. **The constraints are the reputation strategy, not
 a limitation to work around.**
 

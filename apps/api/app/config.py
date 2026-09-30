@@ -34,7 +34,6 @@ class Settings(BaseSettings):
     zerobounce_api_key: str = ""
 
     daily_cap: int = 20
-    cooldown_days: int = 14
 
     def sqlalchemy_database_url(self) -> str:
         return sqlalchemy_url(self.database_url)

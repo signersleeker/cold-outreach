@@ -15,7 +15,6 @@ export const GATE_LABELS: Record<string, string> = {
   template_missing: 'Template missing',
   email_invalid: 'Invalid address',
   contact_suppressed: 'Suppressed',
-  cooldown_active: 'Cooldown active',
   daily_cap_reached: 'Daily cap reached',
   unrendered_merge_tags: 'Unfilled merge fields',
   subject_empty: 'Empty subject',

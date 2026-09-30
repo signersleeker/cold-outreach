@@ -6,15 +6,12 @@ covered here without any I/O.
 
 from __future__ import annotations
 
-import datetime as dt
-
 import pytest
 
 from app.sends.constants import (
     GATE_BODY_EMPTY,
     GATE_CONSUMER_DOMAIN,
     GATE_CONTACT_SUPPRESSED,
-    GATE_COOLDOWN_ACTIVE,
     GATE_DAILY_CAP_REACHED,
     GATE_EMAIL_INVALID,
     GATE_GMAIL_NOT_CONNECTED,
@@ -33,8 +30,6 @@ from app.sends.constants import (
 )
 from app.sends.gates import GateInput, evaluate_gates
 
-NOW = dt.datetime(2026, 3, 2, 4, 0, 0, tzinfo=dt.UTC)  # 14:00 Brisbane
-
 GOOD_BODY = (
     "Hi Avery,\n\nShort note.\n\nJoey\nCEO\nKinnatic Pty Ltd\n"
     'If this isn\'t relevant, reply "no" and I won\'t email again.\n\n'
@@ -52,7 +47,6 @@ def gate_input(**overrides) -> GateInput:
         "company": "Northwind Mutual",
         "title": "CISO",
         "source": "https://example.com/leadership",
-        "last_sent_at": None,
         "template_exists": True,
         "subject": "shadow AI + pre-execution control",
         "final_body": GOOD_BODY,
@@ -63,8 +57,6 @@ def gate_input(**overrides) -> GateInput:
         "company_legal": "Kinnatic Pty Ltd",
         "sends_today": 0,
         "daily_cap": 20,
-        "cooldown_days": 14,
-        "now": NOW,
         "acknowledge": frozenset(),
     }
     fields.update(overrides)
@@ -140,38 +132,6 @@ def test_empty_subject_blocks() -> None:
 
 def test_empty_body_blocks() -> None:
     assert GATE_BODY_EMPTY in codes(evaluate_gates(gate_input(final_body="  ")).blockers)
-
-
-# ------------------------------------------------------------------ cooldown ----
-def test_send_inside_the_cooldown_window_blocks() -> None:
-    result = evaluate_gates(gate_input(last_sent_at=NOW - dt.timedelta(days=3)))
-    assert GATE_COOLDOWN_ACTIVE in codes(result.blockers)
-
-
-def test_cooldown_message_names_the_date_it_clears() -> None:
-    result = evaluate_gates(gate_input(last_sent_at=NOW - dt.timedelta(days=3)))
-    message = next(f.message for f in result.blockers if f.code == GATE_COOLDOWN_ACTIVE)
-    assert "2026-03-13" in message, "3 days ago + 14 days"
-
-
-def test_send_after_the_cooldown_window_is_allowed() -> None:
-    result = evaluate_gates(gate_input(last_sent_at=NOW - dt.timedelta(days=15)))
-    assert GATE_COOLDOWN_ACTIVE not in codes(result.blockers)
-
-
-def test_cooldown_boundary_is_inclusive_of_the_clearing_day() -> None:
-    """Exactly cooldown_days later is allowed; one day earlier is not."""
-    exactly = evaluate_gates(gate_input(last_sent_at=NOW - dt.timedelta(days=14)))
-    assert GATE_COOLDOWN_ACTIVE not in codes(exactly.blockers)
-
-    one_short = evaluate_gates(gate_input(last_sent_at=NOW - dt.timedelta(days=13)))
-    assert GATE_COOLDOWN_ACTIVE in codes(one_short.blockers)
-
-
-def test_naive_last_sent_at_is_treated_as_utc_not_an_error() -> None:
-    naive = (NOW - dt.timedelta(days=3)).replace(tzinfo=None)
-    result = evaluate_gates(gate_input(last_sent_at=naive))
-    assert GATE_COOLDOWN_ACTIVE in codes(result.blockers)
 
 
 # ----------------------------------------------------------------- daily cap ----
@@ -280,7 +240,6 @@ def test_acknowledging_everything_cannot_clear_a_real_blocker() -> None:
             GATE_GMAIL_NOT_CONNECTED,
             GATE_EMAIL_INVALID,
             GATE_CONTACT_SUPPRESSED,
-            GATE_COOLDOWN_ACTIVE,
             GATE_DAILY_CAP_REACHED,
             GATE_UNRENDERED_MERGE_TAGS,
             GATE_VALIDATION_RISKY,
@@ -315,12 +274,11 @@ def test_every_blocker_can_fire_at_once() -> None:
             template_exists=False,
             validation_status="invalid",
             is_suppressed=True,
-            last_sent_at=NOW - dt.timedelta(days=1),
             sends_today=99,
             leftover_tags=("{{company}}",),
             subject="",
             final_body="",
         )
     )
-    assert len(result.blockers) >= 9
+    assert len(result.blockers) >= 8
     assert result.ok is False

@@ -130,15 +130,6 @@ def collect(
     # boolean on the contact row.
     suppression = suppressions_service.is_suppressed(db, contact.email)
 
-    from app.sequences import service as sequences_service
-
-    skip_cooldown = sequences_service.is_current_due_template(
-        db,
-        contact_id=contact.id,
-        template_id=template_id,
-        today=day,
-    )
-
     gate_input = GateInput(
         email=contact.email,
         validation_status=contact.validation_status,
@@ -147,7 +138,6 @@ def collect(
         company=contact.company,
         title=contact.title,
         source=contact.source,
-        last_sent_at=contact.last_sent_at,
         template_exists=template is not None,
         subject=rendered_subject,
         final_body=gate_body,
@@ -158,10 +148,7 @@ def collect(
         company_legal=app_settings.company_legal,
         sends_today=counters.sends_today(db, day),
         daily_cap=settings_service.effective_daily_cap(db),
-        cooldown_days=settings.cooldown_days,
-        now=clock.now(),
         acknowledge=acknowledge,
-        skip_cooldown=skip_cooldown,
     )
 
     return CollectedSend(

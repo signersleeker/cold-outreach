@@ -12,7 +12,6 @@ without a database.
 
 from __future__ import annotations
 
-import datetime as dt
 from dataclasses import dataclass, field
 
 from app.contacts.constants import (
@@ -22,13 +21,11 @@ from app.contacts.constants import (
     VALIDATION_RISKY,
     VALIDATION_UNKNOWN,
 )
-from app.lib.clock import ensure_aware
 from app.lib.text import count_http_links
 from app.sends.constants import (
     GATE_BODY_EMPTY,
     GATE_CONSUMER_DOMAIN,
     GATE_CONTACT_SUPPRESSED,
-    GATE_COOLDOWN_ACTIVE,
     GATE_DAILY_CAP_REACHED,
     GATE_EMAIL_INVALID,
     GATE_GMAIL_NOT_CONNECTED,
@@ -78,7 +75,6 @@ class GateInput:
     company: str
     title: str
     source: str
-    last_sent_at: dt.datetime | None
     # --- template / rendered output ---
     template_exists: bool
     subject: str
@@ -91,20 +87,12 @@ class GateInput:
     company_legal: str
     sends_today: int
     daily_cap: int
-    cooldown_days: int
-    now: dt.datetime
     acknowledge: frozenset[str] = field(default_factory=frozenset)
-    # True when this send is the next due step of an active follow-up plan.
-    skip_cooldown: bool = False
 
 
 def _domain_of(email: str) -> str:
     _, _, domain = email.rpartition("@")
     return domain.lower()
-
-
-def cooldown_clears_on(last_sent_at: dt.datetime, cooldown_days: int) -> dt.date:
-    return (ensure_aware(last_sent_at) + dt.timedelta(days=cooldown_days)).date()
 
 
 def evaluate_gates(i: GateInput) -> GateResult:
@@ -152,17 +140,6 @@ def evaluate_gates(i: GateInput) -> GateResult:
                 f"{i.email} is on the suppression list ({reason}).",
             )
         )
-
-    if i.last_sent_at is not None and not i.skip_cooldown:
-        clears = cooldown_clears_on(i.last_sent_at, i.cooldown_days)
-        if ensure_aware(i.now).date() < clears:
-            blockers.append(
-                GateFinding(
-                    GATE_COOLDOWN_ACTIVE,
-                    f"Already emailed within the last {i.cooldown_days} days. "
-                    f"Clears on {clears.isoformat()}.",
-                )
-            )
 
     if i.sends_today >= i.daily_cap:
         blockers.append(
