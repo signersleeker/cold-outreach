@@ -15,6 +15,7 @@ INDUSTRIES: tuple[str, ...] = (
     "Financial Services",
     "Insurance",
     "Professional Services",
+    "Legal",
     "Healthcare Services",
     "Pharmaceuticals & Biotechnology",
     "Medical Devices",
