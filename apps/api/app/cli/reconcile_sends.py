@@ -19,11 +19,12 @@ import sys
 
 from dotenv import load_dotenv
 
+from app.app_settings import service as settings_service
 from app.config import get_settings
 from app.database import SessionLocal, import_all_models, reset_engine
 from app.gmail.exceptions import GmailError
 from app.gmail.oauth_service import GmailOAuthService, OAuthConfig
-from app.lib.clock import BRISBANE, SystemClock, ensure_aware
+from app.lib.clock import SystemClock, date_in_zone, ensure_aware
 from app.sends.constants import SEND_STATUS_FAILED, SEND_STATUS_SENT
 from app.sends.services import counters
 from app.sends.services.send import SendService
@@ -98,7 +99,7 @@ def main() -> int:
             db.add(event)
             # Release the slot for the day the send was reserved on, not today —
             # a stuck send from last week consumed last week's quota.
-            reserved_day = created_at.astimezone(BRISBANE).date()
+            reserved_day = date_in_zone(created_at, settings_service.effective_timezone(db))
             counters.release_daily_slot(db, reserved_day)
             failed += 1
             print(f"  {event.id}: never sent -> failed, slot released for {reserved_day}")

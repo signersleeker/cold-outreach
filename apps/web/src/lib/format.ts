@@ -1,10 +1,11 @@
-const BRISBANE = 'Australia/Brisbane';
+/** Display timezone for wall-clock times. Defaults match Settings until loaded. */
+export const DEFAULT_TIMEZONE = 'Australia/Brisbane';
 
-/** Absolute Brisbane time — the timezone the daily cap is measured in. */
-export function formatDateTime(iso: string | null): string {
+/** Absolute time in the operator timezone (daily cap / follow-up calendar). */
+export function formatDateTime(iso: string | null, timeZone = DEFAULT_TIMEZONE): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('en-AU', {
-    timeZone: BRISBANE,
+    timeZone,
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -14,10 +15,20 @@ export function formatDateTime(iso: string | null): string {
   });
 }
 
-export function formatDate(iso: string | null): string {
+export function formatDate(iso: string | null, timeZone = DEFAULT_TIMEZONE): string {
   if (!iso) return '—';
+  // Date-only YYYY-MM-DD: format as a calendar day, not a UTC midnight instant.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const [year, month, day] = iso.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('en-AU', {
+      timeZone: 'UTC',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
   return new Date(iso).toLocaleDateString('en-AU', {
-    timeZone: BRISBANE,
+    timeZone,
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -58,6 +69,7 @@ export function fullName(contact: { firstName: string; lastName: string }): stri
 
 export function websiteHref(value: string): string {
   const trimmed = value.trim();
+  if (!trimmed) return '';
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   return `https://${trimmed}`;
 }

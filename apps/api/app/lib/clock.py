@@ -1,18 +1,18 @@
-"""Time, and the Brisbane calendar day the daily cap is measured against.
+"""Time, and the operator calendar day the daily cap is measured against.
 
 Every "now" in this app goes through a Clock so the cap can be tested without
-patching the stdlib. Australia/Brisbane is UTC+10 year round with no DST, so the
-calendar day rolls over at exactly 14:00 UTC — which is what makes the timezone
-tests short and exact.
+patching the stdlib. Calendar days (daily cap, follow-up due dates, activity
+buckets) use the IANA timezone stored in Settings — not the viewer's browser.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 from typing import Protocol
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-BRISBANE = ZoneInfo("Australia/Brisbane")
+# Default for new installs and for code paths that have no Session yet.
+DEFAULT_TIMEZONE = "Australia/Brisbane"
 
 
 class Clock(Protocol):
@@ -26,16 +26,32 @@ class SystemClock:
         return dt.datetime.now(dt.UTC)
 
 
-def brisbane_date(clock: Clock) -> dt.date:
-    """The Brisbane calendar date the daily counter is keyed on."""
-    return clock.now().astimezone(BRISBANE).date()
+def resolve_zone(name: str) -> ZoneInfo:
+    """Return a ZoneInfo, falling back to the default if the name is invalid."""
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, KeyError, ValueError):
+        return ZoneInfo(DEFAULT_TIMEZONE)
 
 
-def brisbane_day_bounds(day: dt.date) -> tuple[dt.datetime, dt.datetime]:
-    """[start, end) in UTC for one Brisbane calendar day, for range queries."""
-    start = dt.datetime.combine(day, dt.time.min, tzinfo=BRISBANE)
+def local_date(clock: Clock, tz: ZoneInfo | str) -> dt.date:
+    """The calendar date in ``tz`` that the daily counter is keyed on."""
+    zone = tz if isinstance(tz, ZoneInfo) else resolve_zone(tz)
+    return clock.now().astimezone(zone).date()
+
+
+def day_bounds(day: dt.date, tz: ZoneInfo | str) -> tuple[dt.datetime, dt.datetime]:
+    """[start, end) in UTC for one calendar day in ``tz``, for range queries."""
+    zone = tz if isinstance(tz, ZoneInfo) else resolve_zone(tz)
+    start = dt.datetime.combine(day, dt.time.min, tzinfo=zone)
     end = start + dt.timedelta(days=1)
     return start.astimezone(dt.UTC), end.astimezone(dt.UTC)
+
+
+def date_in_zone(moment: dt.datetime, tz: ZoneInfo | str) -> dt.date:
+    """Calendar date of an instant in ``tz``."""
+    zone = tz if isinstance(tz, ZoneInfo) else resolve_zone(tz)
+    return ensure_aware(moment).astimezone(zone).date()
 
 
 def ensure_aware(value: dt.datetime) -> dt.datetime:

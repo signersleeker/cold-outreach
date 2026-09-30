@@ -12,7 +12,7 @@ class LastSendDTO(CamelModel):
 
 
 class ActivityDayDTO(CamelModel):
-    """One Brisbane calendar day of send activity.
+    """One calendar day of send activity (in the operator timezone).
 
     `sent` counts everything that actually left the mailbox that day, whatever
     the eventual outcome, so it lines up with the daily cap. `bounced` and
@@ -35,7 +35,8 @@ class ActivityDTO(CamelModel):
 class DashboardDTO(CamelModel):
     sends_today: int
     daily_cap: int
-    brisbane_date: dt.date
+    today: dt.date
+    timezone: str
     gmail_connected: bool
     gmail_email: str
     identity_complete: bool

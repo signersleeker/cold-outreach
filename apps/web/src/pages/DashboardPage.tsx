@@ -1,6 +1,7 @@
 import { Inbox, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
+import { FollowUpCalendar } from '@/components/FollowUpCalendar';
 import { SendActivityChart } from '@/components/charts/SendActivityChart';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -63,7 +64,7 @@ export function DashboardPage() {
     <>
       <PageHeader
         title="Dashboard"
-        description={`Brisbane date ${data.brisbaneDate}. The cap resets at midnight Brisbane time.`}
+        description={`Today ${data.today} (${data.timezone}). The cap resets at midnight in that timezone.`}
         actions={
           <Button
             variant="outline"
@@ -140,6 +141,8 @@ export function DashboardPage() {
             tone={data.bouncedCount > 0 ? 'danger' : 'default'}
           />
         </div>
+
+        <FollowUpCalendar />
 
         <Card>
           <CardHeader>

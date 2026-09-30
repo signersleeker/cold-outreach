@@ -1,6 +1,14 @@
 import { AlertTriangle, Ban, Send } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useSend, useSendHistory, useSendPreview, useTemplateGroups, useTemplates } from '@/hooks';
+import {
+  useContactFollowUp,
+  useEnrollFollowUp,
+  useSend,
+  useSendHistory,
+  useSendPreview,
+  useTemplateGroups,
+  useTemplates,
+} from '@/hooks';
 import type { Contact, GateFinding } from '@/lib/api';
 import { fullName } from '@/lib/format';
 import { gateLabel } from '@/lib/gates';
@@ -35,19 +43,23 @@ export function SendModal({
   contact,
   open,
   onOpenChange,
+  initialTemplateId,
 }: {
   contact: Contact;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialTemplateId?: string;
 }) {
   const { data: templates } = useTemplates();
   const { data: groupsData } = useTemplateGroups();
   const { data: history } = useSendHistory(contact.id, open);
+  const { data: activePlan } = useContactFollowUp(contact.id);
   const [mode, setMode] = useState<'template' | 'group'>('template');
   const [groupId, setGroupId] = useState('');
-  const [templateId, setTemplateId] = useState('');
+  const [templateId, setTemplateId] = useState(initialTemplateId ?? '');
   const [acknowledged, setAcknowledged] = useState<string[]>([]);
   const send = useSend();
+  const enroll = useEnrollFollowUp();
 
   const list = templates?.data ?? [];
   const groups = groupsData?.data ?? [];
@@ -63,6 +75,13 @@ export function SendModal({
   }, [history]);
 
   useEffect(() => {
+    if (open && initialTemplateId) {
+      setMode('template');
+      setTemplateId(initialTemplateId);
+    }
+  }, [open, initialTemplateId]);
+
+  useEffect(() => {
     if (!templateId && list.length > 0 && mode === 'template') setTemplateId(list[0].id);
   }, [list, templateId, mode]);
 
@@ -72,16 +91,17 @@ export function SendModal({
 
   useEffect(() => {
     if (mode !== 'group' || !selectedGroup) return;
-    const inGroup = selectedGroup.items.some((item) => item.templateId === templateId);
-    if (!inGroup) setTemplateId(selectedGroup.items[0]?.templateId ?? '');
+    const first = selectedGroup.items[0]?.templateId ?? '';
+    if (templateId !== first) setTemplateId(first);
   }, [mode, selectedGroup, templateId]);
 
   // Reset per-open so an acknowledgement never leaks between contacts.
   useEffect(() => {
     if (open) {
       setAcknowledged([]);
-      setMode('template');
+      if (!initialTemplateId) setMode('template');
       send.reset();
+      enroll.reset();
     }
   }, [open]);
 
@@ -103,7 +123,23 @@ export function SendModal({
       checked ? [...new Set([...current, code])] : current.filter((c) => c !== code),
     );
 
-  const canSend = Boolean(data?.sendable) && allAcknowledged && !send.isPending;
+  const canSend = Boolean(data?.sendable) && allAcknowledged && !send.isPending && !enroll.isPending;
+
+  async function startSequence() {
+    if (!selectedGroup || !templateId) return;
+    const enrollment = await enroll.mutateAsync({
+      contactId: contact.id,
+      groupId: selectedGroup.id,
+    });
+    const first = enrollment.steps[0];
+    if (!first) return;
+    await send.mutateAsync({
+      contactId: contact.id,
+      templateId: first.templateId,
+      acknowledge: acknowledged,
+    });
+    onOpenChange(false);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -117,6 +153,15 @@ export function SendModal({
               Company industry:{' '}
               <span className="font-medium text-foreground">{contact.companyIndustry}</span>
             </p>
+          ) : null}
+
+          {activePlan && mode === 'template' ? (
+            <Callout tone="neutral">
+              Active plan: {activePlan.groupName}
+              {activePlan.nextStep
+                ? ` — next is step ${activePlan.nextStep.position + 1} (${activePlan.nextStep.templateName})`
+                : ''}
+            </Callout>
           ) : null}
 
           <Segmented
@@ -173,37 +218,41 @@ export function SendModal({
                 ) : null}
               </div>
               {selectedGroup ? (
-                <ol className="space-y-1">
-                  {selectedGroup.items.map((item, index) => {
-                    const active = item.templateId === templateId;
-                    return (
-                      <li key={item.templateId}>
-                        <button
-                          type="button"
-                          onClick={() => setTemplateId(item.templateId)}
-                          className={cn(
-                            'flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-2.5 py-2 text-left text-sm transition-colors',
-                            active
-                              ? 'border-primary bg-accent font-medium text-accent-foreground'
-                              : 'border-border hover:bg-surface',
-                          )}
-                        >
-                          <span className="w-5 font-mono text-xs text-muted-foreground">{index + 1}</span>
-                          <span className="min-w-0 flex-1 truncate">
-                            {item.templateName}
-                            {item.industry ? (
-                              <span className="ml-2 text-xs text-muted-foreground">{item.industry}</span>
-                            ) : null}
-                          </span>
-                          {sentTemplateIds.has(item.templateId) ? <Badge tone="muted">sent</Badge> : null}
-                        </button>
+                <>
+                  <Callout tone="neutral">
+                    Starting this group assigns the plan and sends email 1 now. Later steps appear
+                    on the dashboard calendar when they are due.
+                  </Callout>
+                  <ol className="space-y-1">
+                    {selectedGroup.items.map((item, index) => (
+                      <li
+                        key={item.templateId}
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-2.5 py-2 text-sm',
+                          index === 0
+                            ? 'border-primary bg-accent font-medium text-accent-foreground'
+                            : 'border-border',
+                        )}
+                      >
+                        <span className="w-5 font-mono text-xs text-muted-foreground">
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {item.templateName}
+                          {item.industry ? (
+                            <span className="ml-2 text-xs text-muted-foreground">{item.industry}</span>
+                          ) : null}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {index === 0 ? 'Now' : `+${item.delayDays}d`}
+                        </span>
+                        {sentTemplateIds.has(item.templateId) ? (
+                          <Badge tone="muted">sent</Badge>
+                        ) : null}
                       </li>
-                    );
-                  })}
-                  {selectedGroup.items.length === 0 ? (
-                    <li className="text-xs text-muted-foreground">This group has no templates.</li>
-                  ) : null}
-                </ol>
+                    ))}
+                  </ol>
+                </>
               ) : null}
             </div>
           )}
@@ -286,29 +335,41 @@ export function SendModal({
             </>
           ) : null}
 
-          <ErrorBanner error={send.error} />
+          <ErrorBanner error={send.error ?? enroll.error} />
         </DialogBody>
 
         <DialogFooter>
           <span className="font-mono text-xs text-muted-foreground">
-            {data ? `${data.sendsToday}/${data.dailyCap} sent today (Brisbane)` : ''}
+            {data ? `${data.sendsToday}/${data.dailyCap} sent today` : ''}
           </span>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              disabled={!canSend}
-              onClick={() =>
-                send.mutate(
-                  { contactId: contact.id, templateId, acknowledge: acknowledged },
-                  { onSuccess: () => onOpenChange(false) },
-                )
-              }
-            >
-              <Send className="size-4" />
-              {send.isPending ? 'Sending…' : 'Send'}
-            </Button>
+            {mode === 'group' ? (
+              <Button
+                disabled={!canSend || !selectedGroup}
+                onClick={() => {
+                  void startSequence().catch(() => undefined);
+                }}
+              >
+                <Send className="size-4" />
+                {send.isPending || enroll.isPending ? 'Starting…' : 'Start sequence'}
+              </Button>
+            ) : (
+              <Button
+                disabled={!canSend}
+                onClick={() =>
+                  send.mutate(
+                    { contactId: contact.id, templateId, acknowledge: acknowledged },
+                    { onSuccess: () => onOpenChange(false) },
+                  )
+                }
+              >
+                <Send className="size-4" />
+                {send.isPending ? 'Sending…' : 'Send'}
+              </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>

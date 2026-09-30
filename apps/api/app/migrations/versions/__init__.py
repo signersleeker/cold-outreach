@@ -13,6 +13,8 @@ from app.migrations.versions import (
     m0005_email_validations,
     m0006_company_location,
     m0007_notes,
+    m0008_follow_up_plans,
+    m0009_settings_timezone,
 )
 
 MODULES = (
@@ -23,4 +25,6 @@ MODULES = (
     m0005_email_validations,
     m0006_company_location,
     m0007_notes,
+    m0008_follow_up_plans,
+    m0009_settings_timezone,
 )

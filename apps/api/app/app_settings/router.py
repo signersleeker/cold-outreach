@@ -20,6 +20,7 @@ def _to_dto(row: AppSetting, effective_cap: int) -> AppSettingsDTO:
         from_email=row.from_email,
         reply_hint=row.reply_hint,
         daily_cap=row.daily_cap,
+        timezone=row.timezone,
         include_unsub_link=row.include_unsub_link,
         effective_daily_cap=effective_cap,
         hard_max_daily_cap=HARD_MAX_DAILY_CAP,
@@ -39,7 +40,10 @@ def get_app_settings(db: DbSession) -> Response:
 @router.patch("/settings")
 def patch_app_settings(payload: AppSettingsPatchRequest, db: DbSession) -> Response:
     row = service.get_or_create(db)
-    for name, value in payload.model_dump(exclude_none=True).items():
+    changes = payload.model_dump(exclude_none=True)
+    if "timezone" in changes:
+        changes["timezone"] = service.validate_timezone(changes["timezone"])
+    for name, value in changes.items():
         setattr(row, name, value)
     db.add(row)
     db.commit()

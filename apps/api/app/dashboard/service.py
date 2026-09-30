@@ -15,7 +15,7 @@ from app.contacts.constants import (
 from app.contacts.contact import Contact
 from app.dashboard.schemas import ActivityDayDTO, ActivityDTO, DashboardDTO, LastSendDTO
 from app.gmail.oauth_service import GmailOAuthService
-from app.lib.clock import BRISBANE, Clock, brisbane_date, brisbane_day_bounds, ensure_aware
+from app.lib.clock import Clock, date_in_zone, day_bounds, local_date
 from app.sends.constants import (
     SEND_STATUS_BOUNCED,
     SEND_STATUS_REPLIED_STOP,
@@ -31,16 +31,17 @@ def _count_contacts(db: Session, *where) -> int:  # noqa: ANN002
 
 
 def build_activity(db: Session, *, clock: Clock, days: int = 30) -> ActivityDTO:
-    """Daily send volume for the last `days` Brisbane calendar days.
+    """Daily send volume for the last `days` calendar days in the operator zone.
 
     Bucketing happens in Python rather than SQL: the window is at most a few
-    hundred rows (the cap is the point of this product), and it keeps the
-    Brisbane day boundary defined in exactly one place — brisbane_day_bounds —
-    instead of duplicating the timezone rule in a database expression.
+    hundred rows (the cap is the point of this product), and it keeps the day
+    boundary defined in exactly one place — day_bounds — instead of duplicating
+    the timezone rule in a database expression.
     """
-    today = brisbane_date(clock)
+    tz = settings_service.effective_timezone(db)
+    today = local_date(clock, tz)
     first_day = today - dt.timedelta(days=days - 1)
-    window_start, _ = brisbane_day_bounds(first_day)
+    window_start, _ = day_bounds(first_day, tz)
 
     rows = db.execute(
         select(SendEvent.sent_at, SendEvent.status).where(
@@ -56,7 +57,7 @@ def build_activity(db: Session, *, clock: Clock, days: int = 30) -> ActivityDTO:
     }
 
     for sent_at, status in rows:
-        day = ensure_aware(sent_at).astimezone(BRISBANE).date()
+        day = date_in_zone(sent_at, tz)
         bucket = buckets.get(day)
         if bucket is None:  # A send timestamped in the future; not ours to chart.
             continue
@@ -82,7 +83,8 @@ def build_activity(db: Session, *, clock: Clock, days: int = 30) -> ActivityDTO:
 def build(
     db: Session, *, clock: Clock, oauth: GmailOAuthService, sends: SendService
 ) -> DashboardDTO:
-    day = brisbane_date(clock)
+    tz = settings_service.effective_timezone(db)
+    day = local_date(clock, tz)
     app_settings = settings_service.get_or_create(db)
     gmail_row = oauth.current(db)
 
@@ -108,7 +110,8 @@ def build(
     dto = DashboardDTO(
         sends_today=counters.sends_today(db, day),
         daily_cap=settings_service.effective_daily_cap(db),
-        brisbane_date=day,
+        today=day,
+        timezone=app_settings.timezone,
         gmail_connected=oauth.is_connected(db),
         gmail_email=gmail_row.email if gmail_row else "",
         identity_complete=settings_service.identity_complete(app_settings),

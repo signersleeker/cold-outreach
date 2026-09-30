@@ -94,6 +94,8 @@ class GateInput:
     cooldown_days: int
     now: dt.datetime
     acknowledge: frozenset[str] = field(default_factory=frozenset)
+    # True when this send is the next due step of an active follow-up plan.
+    skip_cooldown: bool = False
 
 
 def _domain_of(email: str) -> str:
@@ -151,7 +153,7 @@ def evaluate_gates(i: GateInput) -> GateResult:
             )
         )
 
-    if i.last_sent_at is not None:
+    if i.last_sent_at is not None and not i.skip_cooldown:
         clears = cooldown_clears_on(i.last_sent_at, i.cooldown_days)
         if ensure_aware(i.now).date() < clears:
             blockers.append(
@@ -166,7 +168,7 @@ def evaluate_gates(i: GateInput) -> GateResult:
         blockers.append(
             GateFinding(
                 GATE_DAILY_CAP_REACHED,
-                f"Daily cap reached ({i.sends_today}/{i.daily_cap} for today in Brisbane).",
+                    f"Daily cap reached ({i.sends_today}/{i.daily_cap} for today).",
             )
         )
 

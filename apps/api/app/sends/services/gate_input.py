@@ -19,7 +19,7 @@ from app.gmail.constants import GMAIL_SETTINGS_SCOPE
 from app.gmail.exceptions import GmailPermanentError
 from app.gmail.mime import build_message_parts
 from app.gmail.oauth_service import GmailOAuthService
-from app.lib.clock import Clock, brisbane_date
+from app.lib.clock import Clock, local_date
 from app.sends.gates import GateInput
 from app.sends.services import counters
 from app.sends.services.compose import compose_gate_body
@@ -84,7 +84,7 @@ def collect(
 ) -> CollectedSend:
     app_settings = settings_service.get_or_create(db)
     template = templates_service.get(db, template_id)
-    day = brisbane_date(clock)
+    day = local_date(clock, settings_service.effective_timezone(db))
 
     context = build_context(
         first_name=contact.first_name,
@@ -130,6 +130,15 @@ def collect(
     # boolean on the contact row.
     suppression = suppressions_service.is_suppressed(db, contact.email)
 
+    from app.sequences import service as sequences_service
+
+    skip_cooldown = sequences_service.is_current_due_template(
+        db,
+        contact_id=contact.id,
+        template_id=template_id,
+        today=day,
+    )
+
     gate_input = GateInput(
         email=contact.email,
         validation_status=contact.validation_status,
@@ -152,6 +161,7 @@ def collect(
         cooldown_days=settings.cooldown_days,
         now=clock.now(),
         acknowledge=acknowledge,
+        skip_cooldown=skip_cooldown,
     )
 
     return CollectedSend(

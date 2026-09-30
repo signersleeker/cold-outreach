@@ -9,7 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useTemplateGroupMutations, useTemplateGroups, useTemplates } from '@/hooks';
 import { cn } from '@/lib/utils';
 
-const BLANK = { name: '', templateIds: [] as string[] };
+type DraftItem = { templateId: string; delayDays: number };
+
+const BLANK = { name: '', items: [] as DraftItem[] };
 
 export function TemplateGroupsPanel() {
   const { data, isLoading } = useTemplateGroups();
@@ -29,38 +31,64 @@ export function TemplateGroupsPanel() {
     if (!selectedId && groups.length > 0) setSelectedId(groups[0].id);
   }, [groups, selectedId]);
 
-  const itemKey = selected?.items.map((item) => item.templateId).join(',') ?? '';
+  const itemKey =
+    selected?.items.map((item) => `${item.templateId}:${item.delayDays}`).join(',') ?? '';
 
   useEffect(() => {
     if (creating) setDraft(BLANK);
     else if (selected) {
       setDraft({
         name: selected.name,
-        templateIds: selected.items.map((item) => item.templateId),
+        items: selected.items.map((item) => ({
+          templateId: item.templateId,
+          delayDays: item.delayDays,
+        })),
       });
     }
   }, [selectedId, selected?.updatedAt, itemKey]);
 
-  const savedIds = selected?.items.map((item) => item.templateId) ?? [];
   const dirty =
     creating ||
     (selected !== null &&
       (draft.name !== selected.name ||
-        draft.templateIds.length !== savedIds.length ||
-        draft.templateIds.some((id, index) => id !== savedIds[index])));
+        draft.items.length !== selected.items.length ||
+        draft.items.some(
+          (item, index) =>
+            item.templateId !== selected.items[index]?.templateId ||
+            item.delayDays !== selected.items[index]?.delayDays,
+        )));
 
-  const available = templates.filter((template) => !draft.templateIds.includes(template.id));
+  const available = templates.filter(
+    (template) => !draft.items.some((item) => item.templateId === template.id),
+  );
   const byId = new Map(templates.map((template) => [template.id, template]));
 
   function move(index: number, delta: number) {
     setDraft((current) => {
-      const next = [...current.templateIds];
+      const next = [...current.items];
       const target = index + delta;
       if (target < 0 || target >= next.length) return current;
       const [item] = next.splice(index, 1);
       next.splice(target, 0, item);
-      return { ...current, templateIds: next };
+      return {
+        ...current,
+        items: next.map((entry, position) =>
+          position === 0 ? { ...entry, delayDays: 0 } : entry.delayDays < 1
+            ? { ...entry, delayDays: 1 }
+            : entry,
+        ),
+      };
     });
+  }
+
+  function setDelay(index: number, delayDays: number) {
+    if (index === 0) return;
+    setDraft((current) => ({
+      ...current,
+      items: current.items.map((item, i) =>
+        i === index ? { ...item, delayDays: Math.max(1, delayDays) } : item,
+      ),
+    }));
   }
 
   return (
@@ -128,12 +156,19 @@ export function TemplateGroupsPanel() {
                 disabled={
                   !dirty ||
                   !draft.name.trim() ||
-                  draft.templateIds.length === 0 ||
+                  draft.items.length === 0 ||
+                  draft.items.some((item, index) => index > 0 && item.delayDays < 1) ||
                   create.isPending ||
                   update.isPending
                 }
                 onClick={() => {
-                  const input = { name: draft.name.trim(), templateIds: draft.templateIds };
+                  const input = {
+                    name: draft.name.trim(),
+                    items: draft.items.map((item, index) => ({
+                      templateId: item.templateId,
+                      delayDays: index === 0 ? 0 : item.delayDays,
+                    })),
+                  };
                   if (creating) {
                     create.mutate(input, { onSuccess: (group) => setSelectedId(group.id) });
                   } else if (selected) {
@@ -156,16 +191,18 @@ export function TemplateGroupsPanel() {
             </Field>
 
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Templates, in send order</p>
-              {draft.templateIds.length === 0 ? (
+              <p className="text-xs font-medium text-muted-foreground">
+                Templates, in send order. Delay is days after the previous email was sent.
+              </p>
+              {draft.items.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Add at least one template.</p>
               ) : (
                 <ol className="space-y-1">
-                  {draft.templateIds.map((templateId, index) => {
-                    const template = byId.get(templateId);
+                  {draft.items.map((item, index) => {
+                    const template = byId.get(item.templateId);
                     return (
                       <li
-                        key={templateId}
+                        key={item.templateId}
                         className="flex items-center gap-2 rounded-[var(--radius-sm)] border px-2 py-1.5"
                       >
                         <span className="w-5 font-mono text-xs text-muted-foreground">{index + 1}</span>
@@ -175,6 +212,25 @@ export function TemplateGroupsPanel() {
                             <span className="ml-2 text-xs text-muted-foreground">{template.industry}</span>
                           ) : null}
                         </span>
+                        {index === 0 ? (
+                          <span className="shrink-0 rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                            Now
+                          </span>
+                        ) : (
+                          <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                            <Input
+                              type="number"
+                              min={1}
+                              max={365}
+                              className="h-7 w-14 px-1.5 text-center font-mono"
+                              value={item.delayDays}
+                              onChange={(event) =>
+                                setDelay(index, Number.parseInt(event.target.value, 10) || 1)
+                              }
+                            />
+                            days later
+                          </label>
+                        )}
                         <Button
                           size="icon"
                           variant="ghost"
@@ -187,7 +243,7 @@ export function TemplateGroupsPanel() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          disabled={index === draft.templateIds.length - 1}
+                          disabled={index === draft.items.length - 1}
                           onClick={() => move(index, 1)}
                           title="Move later"
                         >
@@ -200,7 +256,11 @@ export function TemplateGroupsPanel() {
                           onClick={() =>
                             setDraft((current) => ({
                               ...current,
-                              templateIds: current.templateIds.filter((id) => id !== templateId),
+                              items: current.items
+                                .filter((entry) => entry.templateId !== item.templateId)
+                                .map((entry, position) =>
+                                  position === 0 ? { ...entry, delayDays: 0 } : entry,
+                                ),
                             }))
                           }
                         >
@@ -222,7 +282,13 @@ export function TemplateGroupsPanel() {
                   onValueChange={(templateId) => {
                     setDraft((current) => ({
                       ...current,
-                      templateIds: [...current.templateIds, templateId],
+                      items: [
+                        ...current.items,
+                        {
+                          templateId,
+                          delayDays: current.items.length === 0 ? 0 : 5,
+                        },
+                      ],
                     }));
                     setAddKey((key) => key + 1);
                   }}

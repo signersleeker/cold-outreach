@@ -3,7 +3,7 @@
 Internal tool for founder-led 1:1 cold outreach. Upload a CSV of prospects, pick one row and one
 template, read exactly what will be sent, click Send. The server sends a single plain-text email
 through one Google Workspace mailbox via the Gmail API, with a hard cap of 20 successful sends per
-Australia/Brisbane calendar day.
+calendar day in the operator timezone (default `Australia/Brisbane`, set in Settings).
 
 **What this is not**, by design:
 
@@ -219,7 +219,7 @@ did.
 | `email_invalid`          | Nothing. Invalid addresses are never sent to                     |
 | `contact_suppressed`     | Nothing automatic. Only a manual removal from Suppressions        |
 | `cooldown_active`        | Waiting out `COOLDOWN_DAYS` (default 14)                          |
-| `daily_cap_reached`      | The next Brisbane day                                            |
+| `daily_cap_reached`      | The next calendar day in the operator timezone                   |
 | `unrendered_merge_tags`  | Filling the missing contact field, or using another template      |
 | `subject_empty` / `body_empty` | Fixing the template                                        |
 | `warning_not_acknowledged` | Ticking the "send anyway" box for each flagged warning          |
@@ -271,8 +271,8 @@ tag.
 
 ## The daily cap
 
-The cap counts successful sends per **Australia/Brisbane calendar day**. Brisbane is UTC+10 all year
-with no daylight saving, so the day rolls over at exactly **14:00 UTC**.
+The cap counts successful sends per **calendar day in the operator timezone** (IANA name in
+Settings; default `Australia/Brisbane`). The day rolls over at midnight in that zone.
 
 A slot is reserved **before** the Gmail call and compensated on failure, so the app under-sends
 rather than risking a double send:

@@ -119,11 +119,18 @@ export interface Template {
 }
 
 export interface TemplateGroupItem {
+  id: string;
   position: number;
   templateId: string;
   templateName: string;
   subject: string;
   industry: string;
+  delayDays: number;
+}
+
+export interface TemplateGroupItemInput {
+  templateId: string;
+  delayDays: number;
 }
 
 export interface TemplateGroup {
@@ -132,6 +139,66 @@ export interface TemplateGroup {
   items: TemplateGroupItem[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface FollowUpStep {
+  id: string;
+  groupItemId: string | null;
+  templateId: string;
+  templateName: string;
+  subject: string;
+  position: number;
+  delayDays: number;
+  status: 'pending' | 'sent' | 'cancelled';
+  dueOn: string | null;
+  sentAt: string | null;
+}
+
+export interface FollowUpEnrollment {
+  id: string;
+  contactId: string;
+  groupId: string;
+  groupName: string;
+  status: 'active' | 'cancelled' | 'completed';
+  assignedAt: string;
+  cancelledAt: string | null;
+  completedAt: string | null;
+  steps: FollowUpStep[];
+  nextStep: FollowUpStep | null;
+}
+
+export interface CalendarDueItem {
+  enrollmentId: string;
+  stepId: string;
+  contactId: string;
+  contactEmail: string;
+  contactName: string;
+  company: string;
+  groupId: string;
+  groupName: string;
+  templateId: string;
+  templateName: string;
+  position: number;
+  stepCount: number;
+  dueOn: string;
+  overdue: boolean;
+  pastCap: boolean;
+}
+
+export interface CalendarDay {
+  date: string;
+  items: CalendarDueItem[];
+  overdueCount: number;
+}
+
+export interface FollowUpCalendar {
+  today: string;
+  timezone: string;
+  dailyCap: number;
+  sendsToday: number;
+  remaining: number;
+  overdueTotal: number;
+  days: CalendarDay[];
 }
 
 export interface GateFinding {
@@ -183,6 +250,7 @@ export interface AppSettings {
   fromEmail: string;
   replyHint: string;
   dailyCap: number;
+  timezone: string;
   includeUnsubLink: boolean;
   effectiveDailyCap: number;
   hardMaxDailyCap: number;
@@ -207,7 +275,8 @@ export interface GmailStatus {
 export interface Dashboard {
   sendsToday: number;
   dailyCap: number;
-  brisbaneDate: string;
+  today: string;
+  timezone: string;
   gmailConnected: boolean;
   gmailEmail: string;
   identityComplete: boolean;
@@ -449,14 +518,14 @@ export const api = {
     unwrap<{ deleted: boolean }>(`/api/v1/templates/${id}`, { method: 'DELETE' }),
 
   templateGroups: () => unwrapList<TemplateGroup[], unknown>('/api/v1/template-groups'),
-  createTemplateGroup: (input: { name: string; templateIds: string[] }) =>
+  createTemplateGroup: (input: { name: string; items: TemplateGroupItemInput[] }) =>
     unwrap<TemplateGroup>('/api/v1/template-groups', {
       method: 'POST',
       body: JSON.stringify(input),
     }),
   updateTemplateGroup: (
     id: string,
-    input: Partial<{ name: string; templateIds: string[] }>,
+    input: Partial<{ name: string; items: TemplateGroupItemInput[] }>,
   ) =>
     unwrap<TemplateGroup>(`/api/v1/template-groups/${id}`, {
       method: 'PATCH',
@@ -464,6 +533,23 @@ export const api = {
     }),
   deleteTemplateGroup: (id: string) =>
     unwrap<{ deleted: boolean }>(`/api/v1/template-groups/${id}`, { method: 'DELETE' }),
+
+  followUpCalendar: (year: number, month: number) =>
+    unwrap<FollowUpCalendar>(
+      `/api/v1/follow-ups/calendar?year=${year}&month=${month}`,
+    ),
+  contactFollowUp: (contactId: string) =>
+    unwrap<FollowUpEnrollment | null>(`/api/v1/contacts/${contactId}/follow-up`),
+  enrollFollowUp: (input: { contactId: string; groupId: string }) =>
+    unwrap<FollowUpEnrollment>('/api/v1/follow-ups', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  cancelFollowUp: (contactId: string) =>
+    unwrap<FollowUpEnrollment | { deleted: boolean }>(
+      `/api/v1/contacts/${contactId}/follow-up`,
+      { method: 'DELETE' },
+    ),
 
   // sends
   previewSend: (input: { contactId: string; templateId: string; acknowledge: string[] }) =>

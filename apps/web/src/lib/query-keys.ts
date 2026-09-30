@@ -30,6 +30,9 @@ export const queryKeys = {
     ['notes', notableType, notableId] as const,
   templates: ['templates'] as const,
   templateGroups: ['template-groups'] as const,
+  followUpCalendar: (year: number, month: number) =>
+    ['follow-ups', 'calendar', year, month] as const,
+  contactFollowUp: (contactId: string) => ['follow-ups', 'contact', contactId] as const,
   sendPreview: (contactId: string, templateId: string, acknowledge: string[]) =>
     ['send-preview', contactId, templateId, [...acknowledge].sort()] as const,
   sendHistory: (contactId?: string) => ['sends', contactId ?? 'all'] as const,

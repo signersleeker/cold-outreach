@@ -40,11 +40,18 @@ class TemplatePatchRequest(CamelModel):
 
 
 class TemplateGroupItemDTO(CamelModel):
+    id: uuid.UUID
     position: int
     template_id: uuid.UUID
     template_name: str
     subject: str
     industry: str = ""
+    delay_days: int = 0
+
+
+class TemplateGroupItemInput(CamelModel):
+    template_id: uuid.UUID
+    delay_days: int = Field(default=0, ge=0, le=365)
 
 
 class TemplateGroupDTO(CamelModel):
@@ -57,9 +64,9 @@ class TemplateGroupDTO(CamelModel):
 
 class TemplateGroupCreateRequest(CamelModel):
     name: str = Field(min_length=1, max_length=120)
-    template_ids: list[uuid.UUID] = Field(min_length=1)
+    items: list[TemplateGroupItemInput] = Field(min_length=1)
 
 
 class TemplateGroupPatchRequest(CamelModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
-    template_ids: list[uuid.UUID] | None = None
+    items: list[TemplateGroupItemInput] | None = None

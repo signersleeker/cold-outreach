@@ -31,13 +31,14 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.app_settings import service as settings_service
 from app.config import Settings
 from app.contacts.contact import Contact
 from app.gmail.client import GmailClient
 from app.gmail.exceptions import GmailAmbiguousError, GmailPermanentError
 from app.gmail.mime import build_outbound_message, encode_raw, new_message_id
 from app.gmail.oauth_service import GmailOAuthService
-from app.lib.clock import Clock, brisbane_date
+from app.lib.clock import Clock, local_date
 from app.lib.errors import AppError
 from app.sends.constants import (
     SEND_STATUS_FAILED,
@@ -48,7 +49,6 @@ from app.sends.gates import GateResult, evaluate_gates
 from app.sends.models.send_event import SendEvent
 from app.sends.services import counters
 from app.sends.services.gate_input import collect
-
 
 @dataclass(frozen=True)
 class SendPreview:
@@ -134,7 +134,7 @@ class SendService:
         template_id: uuid.UUID,
         acknowledge: frozenset[str] = frozenset(),
     ) -> SendEvent:
-        day = brisbane_date(self.clock)
+        day = local_date(self.clock, settings_service.effective_timezone(db))
 
         # ---------------------------- TX1: reserve ----------------------------
         # FOR UPDATE first: the lock is what serialises two concurrent sends to
@@ -164,7 +164,7 @@ class SendService:
         if counters.reserve_daily_slot(db, day, cap) is None:
             db.rollback()
             raise AppError(
-                422, f"Daily cap reached ({cap} for today in Brisbane). Try again tomorrow."
+                422, f"Daily cap reached ({cap} for today). Try again tomorrow."
             )
 
         now = self.clock.now()
@@ -232,6 +232,17 @@ class SendService:
         event.sent_at = settled
         event.settled_at = settled
         db.add(event)
+
+        from app.sequences import service as sequences_service
+
+        sequences_service.advance_after_send(
+            db,
+            contact_id=contact.id,
+            template_id=template_id,
+            send_event=event,
+            clock=self.clock,
+        )
+
         db.commit()
         db.refresh(event)
         return event

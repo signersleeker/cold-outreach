@@ -2,6 +2,7 @@ import { ArrowLeft, RefreshCw, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
+import { ContactFollowUpCard } from '@/components/ContactFollowUpCard';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
 import { NotesCard } from '@/components/NotesCard';
 import { SendModal, ValidationBadge } from '@/components/SendModal';
@@ -33,6 +34,7 @@ export function ContactDetailPage() {
   const { data: history } = useSendHistory(id);
   const [draft, setDraft] = useState<Partial<Contact>>({});
   const [sendOpen, setSendOpen] = useState(false);
+  const [sendTemplateId, setSendTemplateId] = useState<string | undefined>();
 
   useEffect(() => {
     setDraft({});
@@ -191,6 +193,14 @@ export function ContactDetailPage() {
 
           <NotesCard notableType="contact" notableId={contact.id} />
 
+          <ContactFollowUpCard
+            contactId={contact.id}
+            onSendStep={(templateId) => {
+              setSendTemplateId(templateId);
+              setSendOpen(true);
+            }}
+          />
+
           <Card>
             <CardHeader>
               <CardTitle>Send history</CardTitle>
@@ -269,7 +279,15 @@ export function ContactDetailPage() {
         </Card>
       </PageBody>
 
-      <SendModal contact={contact} open={sendOpen} onOpenChange={setSendOpen} />
+      <SendModal
+        contact={contact}
+        open={sendOpen}
+        onOpenChange={(open) => {
+          setSendOpen(open);
+          if (!open) setSendTemplateId(undefined);
+        }}
+        initialTemplateId={sendTemplateId}
+      />
     </>
   );
 }

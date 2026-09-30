@@ -9,7 +9,7 @@ from app.database import Base
 
 
 class DailyCounter(Base):
-    """Successful-send slots consumed per Brisbane calendar day.
+    """Successful-send slots consumed per operator-timezone calendar day.
 
     `date` is the primary key so the reservation in
     app/sends/services/counters.py can use it as the ON CONFLICT target, making

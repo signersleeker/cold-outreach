@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.gmail.constants import FORBIDDEN_HEADERS
-from app.lib.clock import brisbane_date
+from app.lib.clock import DEFAULT_TIMEZONE, local_date
 from app.lib.errors import AppError
 from app.sends.constants import (
     GATE_COOLDOWN_ACTIVE,
@@ -77,7 +77,7 @@ def test_preview_does_not_consume_a_slot(
 ) -> None:
     for _ in range(3):
         send_service.preview(db, contact_id=contact.id, template_id=template.id)
-    assert counters.sends_today(db, brisbane_date(clock)) == 0
+    assert counters.sends_today(db, local_date(clock, DEFAULT_TIMEZONE)) == 0
 
 
 def test_preview_reports_blockers_without_raising(
@@ -109,7 +109,7 @@ def test_send_records_the_gmail_message_id_and_moves_the_counter(
     assert event.status == SEND_STATUS_SENT
     assert event.gmail_message_id == "gmail-abc-123"
     assert event.sent_at == clock.now()
-    assert counters.sends_today(db, brisbane_date(clock)) == 1
+    assert counters.sends_today(db, local_date(clock, DEFAULT_TIMEZONE)) == 1
     assert len(gmail.sent_raw) == 1
 
 
@@ -137,7 +137,7 @@ def test_send_refuses_when_gmail_is_not_connected(
         send_service.send(db, contact_id=contact.id, template_id=template.id)
     assert exc.value.status_code == 422
     assert gmail.sent_raw == [], "nothing may leave before the gates pass"
-    assert counters.sends_today(db, brisbane_date(clock)) == 0
+    assert counters.sends_today(db, local_date(clock, DEFAULT_TIMEZONE)) == 0
 
 
 def test_cooldown_blocks_an_immediate_resend(
@@ -225,7 +225,7 @@ def test_the_cap_stops_sending(
 
     assert sent == 3
     assert len(gmail.sent_raw) == 3
-    assert counters.sends_today(db, brisbane_date(clock)) == 3
+    assert counters.sends_today(db, local_date(clock, DEFAULT_TIMEZONE)) == 3
 
 
 def test_the_cap_is_clamped_to_the_server_ceiling(
@@ -240,7 +240,7 @@ def test_the_cap_is_clamped_to_the_server_ceiling(
     assert settings_service.effective_daily_cap(db) == HARD_MAX_DAILY_CAP
 
 
-def test_the_cap_resets_on_the_next_brisbane_day(
+def test_the_cap_resets_on_the_next_calendar_day(
     db: Session, make_contact, template, app_settings, connected_gmail, send_service, gmail, clock
 ) -> None:
     app_settings.daily_cap = 1
@@ -273,7 +273,7 @@ def test_permanent_gmail_failure_releases_the_slot_and_undoes_the_cooldown(
         send_service.send(db, contact_id=contact.id, template_id=template.id)
     assert exc.value.status_code == 502
 
-    assert counters.sends_today(db, brisbane_date(clock)) == 0, "slot returned"
+    assert counters.sends_today(db, local_date(clock, DEFAULT_TIMEZONE)) == 0, "slot returned"
     db.refresh(contact)
     assert contact.last_sent_at is None, "cooldown stamp rolled back"
 
@@ -304,7 +304,7 @@ def test_ambiguous_gmail_failure_keeps_the_slot_consumed(
         send_service.send(db, contact_id=contact.id, template_id=template.id)
     assert exc.value.status_code == 504
 
-    assert counters.sends_today(db, brisbane_date(clock)) == 1, "slot deliberately retained"
+    assert counters.sends_today(db, local_date(clock, DEFAULT_TIMEZONE)) == 1, "slot deliberately retained"
     db.refresh(contact)
     assert contact.last_sent_at is not None, "cooldown deliberately retained"
 

@@ -27,6 +27,7 @@ from app.lib.response import error_body
 from app.notes.router import router as notes_router
 from app.sends.router import router as sends_router
 from app.sends.services.send import SendService
+from app.sequences.router import router as sequences_router
 from app.suppressions.router import router as suppressions_router
 from app.templates.groups_router import router as template_groups_router
 from app.templates.router import router as templates_router
@@ -43,6 +44,7 @@ _API_ROUTERS = (
     companies_router,
     templates_router,
     template_groups_router,
+    sequences_router,
     sends_router,
     suppressions_router,
     settings_router,

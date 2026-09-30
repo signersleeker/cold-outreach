@@ -32,6 +32,11 @@ class AppSetting(Base):
 
     daily_cap: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("20"))
 
+    # IANA timezone for the daily cap and follow-up due dates (e.g. Australia/Brisbane).
+    timezone: Mapped[str] = mapped_column(
+        String(64), nullable=False, server_default=text("'Australia/Brisbane'")
+    )
+
     # When false, outbound mail skips the per-contact unsubscribe URL footer.
     include_unsub_link: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="true"

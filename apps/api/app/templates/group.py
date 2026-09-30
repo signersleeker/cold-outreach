@@ -11,7 +11,7 @@ from app.database import Base
 
 
 class TemplateGroup(Base):
-    """A named, ordered set of templates. Sending is still one template at a time."""
+    """A named, ordered set of templates with a delay after each previous send."""
 
     __tablename__ = "template_groups"
 
@@ -55,6 +55,8 @@ class TemplateGroupItem(Base):
         nullable=False,
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Days after the previous email was actually sent. Position 0 is always 0.
+    delay_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
     group = relationship("TemplateGroup", back_populates="items")
     template = relationship("Template")

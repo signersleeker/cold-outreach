@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from zoneinfo import ZoneInfo
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.app_settings.app_setting import SETTINGS_ID, AppSetting
 from app.config import get_settings
 from app.constants import HARD_MAX_DAILY_CAP
+from app.lib.clock import DEFAULT_TIMEZONE, resolve_zone
+from app.lib.errors import AppError
 from app.templates.constants import (
     DEFAULT_COMPANY_LEGAL,
     DEFAULT_SENDER_NAME,
@@ -23,6 +27,7 @@ def get_or_create(db: Session) -> AppSetting:
         sender_title=DEFAULT_SENDER_TITLE,
         company_legal=DEFAULT_COMPANY_LEGAL,
         daily_cap=get_settings().daily_cap,
+        timezone=DEFAULT_TIMEZONE,
         include_unsub_link=True,
     )
     db.add(row)
@@ -38,6 +43,22 @@ def effective_daily_cap(db: Session) -> int:
     """
     stored = get_or_create(db).daily_cap
     return max(1, min(stored, HARD_MAX_DAILY_CAP))
+
+
+def effective_timezone(db: Session) -> ZoneInfo:
+    """IANA zone used for the daily cap and follow-up due dates."""
+    return resolve_zone(get_or_create(db).timezone or DEFAULT_TIMEZONE)
+
+
+def validate_timezone(name: str) -> str:
+    stripped = name.strip()
+    if not stripped:
+        raise AppError(400, "a timezone is required")
+    try:
+        ZoneInfo(stripped)
+    except Exception as exc:
+        raise AppError(400, f"unknown timezone {stripped!r}") from exc
+    return stripped
 
 
 def set_from_email(db: Session, email: str) -> AppSetting:

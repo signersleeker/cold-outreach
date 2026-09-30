@@ -271,6 +271,7 @@ export function useTemplateGroupMutations() {
   const client = useQueryClient();
   const invalidate = () => {
     client.invalidateQueries({ queryKey: queryKeys.templateGroups });
+    client.invalidateQueries({ queryKey: ['follow-ups'] });
   };
   return {
     create: useMutation({ mutationFn: api.createTemplateGroup, onSuccess: invalidate }),
@@ -281,12 +282,51 @@ export function useTemplateGroupMutations() {
       }: {
         id: string;
         name?: string;
-        templateIds?: string[];
+        items?: { templateId: string; delayDays: number }[];
       }) => api.updateTemplateGroup(id, input),
       onSuccess: invalidate,
     }),
     remove: useMutation({ mutationFn: api.deleteTemplateGroup, onSuccess: invalidate }),
   };
+}
+
+export const useFollowUpCalendar = (year: number, month: number) =>
+  useQuery({
+    queryKey: queryKeys.followUpCalendar(year, month),
+    queryFn: () => api.followUpCalendar(year, month),
+    refetchInterval: 60_000,
+  });
+
+export const useContactFollowUp = (contactId: string) =>
+  useQuery({
+    queryKey: queryKeys.contactFollowUp(contactId),
+    queryFn: () => api.contactFollowUp(contactId),
+    enabled: !!contactId,
+  });
+
+export function useEnrollFollowUp() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: api.enrollFollowUp,
+    onSuccess: (enrollment) => {
+      client.invalidateQueries({ queryKey: ['follow-ups'] });
+      client.invalidateQueries({ queryKey: queryKeys.contactFollowUp(enrollment.contactId) });
+      client.invalidateQueries({ queryKey: queryKeys.dashboard });
+      client.invalidateQueries({ queryKey: ['send-preview'] });
+    },
+  });
+}
+
+export function useCancelFollowUp() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (contactId: string) => api.cancelFollowUp(contactId),
+    onSuccess: (_result, contactId) => {
+      client.invalidateQueries({ queryKey: ['follow-ups'] });
+      client.invalidateQueries({ queryKey: queryKeys.contactFollowUp(contactId) });
+      client.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
+  });
 }
 
 // ------------------------------------------------------------------- sends ----
@@ -312,6 +352,7 @@ export function useSend() {
       client.invalidateQueries({ queryKey: ['contacts'] });
       client.invalidateQueries({ queryKey: ['sends'] });
       client.invalidateQueries({ queryKey: ['send-preview'] });
+      client.invalidateQueries({ queryKey: ['follow-ups'] });
     },
   });
 }

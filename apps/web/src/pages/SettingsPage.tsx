@@ -26,11 +26,13 @@ export function SettingsPage() {
   const [params, setParams] = useSearchParams();
 
   const [dailyCap, setDailyCap] = useState(20);
+  const [timezone, setTimezone] = useState('Australia/Brisbane');
   const [includeUnsubLink, setIncludeUnsubLink] = useState(true);
 
   useEffect(() => {
     if (settings) {
       setDailyCap(settings.dailyCap);
+      setTimezone(settings.timezone);
       setIncludeUnsubLink(settings.includeUnsubLink);
     }
   }, [settings?.updatedAt]);
@@ -223,15 +225,15 @@ export function SettingsPage() {
             <Button
               size="sm"
               disabled={update.isPending}
-              onClick={() => update.mutate({ dailyCap })}
+              onClick={() => update.mutate({ dailyCap, timezone: timezone.trim() })}
             >
               {update.isPending ? 'Saving…' : 'Save'}
             </Button>
           </CardHeader>
           <CardBody className="space-y-2">
             <Field
-              label={`Sends per Brisbane calendar day (max ${settings.hardMaxDailyCap})`}
-              hint={`Currently enforcing ${settings.effectiveDailyCap}. The server clamps this to ${settings.hardMaxDailyCap} regardless of what is stored.`}
+              label={`Sends per calendar day (max ${settings.hardMaxDailyCap})`}
+              hint={`Currently enforcing ${settings.effectiveDailyCap}. The day rolls over at midnight in ${settings.timezone}. The server clamps this to ${settings.hardMaxDailyCap} regardless of what is stored.`}
             >
               <Input
                 type="number"
@@ -240,6 +242,17 @@ export function SettingsPage() {
                 className="max-w-28"
                 value={dailyCap}
                 onChange={(e) => setDailyCap(Number(e.target.value) || 1)}
+              />
+            </Field>
+            <Field
+              label="Timezone"
+              hint="IANA name used for the daily cap and follow-up due dates (e.g. Australia/Sydney, America/New_York)."
+            >
+              <Input
+                value={timezone}
+                maxLength={64}
+                placeholder="Australia/Brisbane"
+                onChange={(e) => setTimezone(e.target.value)}
               />
             </Field>
             {overCap ? (
