@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useTemplateGroupMutations, useTemplateGroups, useTemplates } from '@/hooks';
 import { cn } from '@/lib/utils';
 
@@ -63,26 +64,32 @@ export function TemplateGroupsPanel() {
   }
 
   return (
-    <div className="grid gap-4 px-6 py-4 lg:grid-cols-[14rem_1fr]">
+    <div className="grid gap-4 px-6 py-5 lg:grid-cols-[14rem_1fr]">
       <Card className="h-fit overflow-hidden">
-        <div className="border-b px-3 py-2">
+        <div className="border-b border-border px-3 py-2.5">
           <Button size="sm" variant="outline" className="w-full" onClick={() => setSelectedId('new')}>
             <Plus />
             New group
           </Button>
         </div>
         {isLoading ? (
-          <p className="px-3 py-3 text-xs text-muted-foreground">Loading…</p>
+          <div className="space-y-3 p-3">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-3.5" style={{ opacity: 1 - i * 0.2 }} />
+            ))}
+          </div>
         ) : (
-          <ul className="divide-y">
+          <ul className="divide-y divide-border">
             {groups.map((group) => (
               <li key={group.id}>
                 <button
                   type="button"
                   onClick={() => setSelectedId(group.id)}
                   className={cn(
-                    'w-full px-3 py-2 text-left text-sm transition-colors',
-                    selectedId === group.id ? 'bg-accent font-medium' : 'hover:bg-accent/60',
+                    'relative w-full px-3 py-2.5 text-left text-sm transition-colors',
+                    selectedId === group.id
+                      ? 'bg-accent font-semibold text-accent-foreground before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary'
+                      : 'hover:bg-surface',
                   )}
                 >
                   {group.name}

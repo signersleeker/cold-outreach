@@ -1,18 +1,29 @@
 import { Ban, Send, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ErrorBanner, PageHeader } from '@/components/AppLayout';
+import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
+import { ListCompositionBar } from '@/components/charts/ListCompositionBar';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
 import { NewContactDialog } from '@/components/NewContactDialog';
 import { SendModal, ValidationBadge } from '@/components/SendModal';
 import { Button } from '@/components/ui/button';
-import { Card, EmptyState } from '@/components/ui/card';
+import { Callout } from '@/components/ui/callout';
+import { Card, CardBody, EmptyState } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/pagination';
+import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
-import { useContacts, useImportContacts, usePreviewImport, useSuppressContact } from '@/hooks';
+import {
+  useContacts,
+  useContactStats,
+  useImportContacts,
+  usePreviewImport,
+  useSuppressContact,
+} from '@/hooks';
 import type { Contact, ContactFilter } from '@/lib/api';
 import { formatRelative, fullName, plural } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -90,7 +101,7 @@ function ImportDialog() {
             ref={fileInput}
             type="file"
             accept=".csv,text/csv"
-            className="block w-full text-xs file:mr-3 file:rounded-[var(--radius-sm)] file:border file:border-input file:bg-card file:px-2.5 file:py-1.5 file:text-xs"
+            className="block w-full cursor-pointer rounded-[var(--radius-md)] border border-dashed border-input bg-surface px-3 py-3 text-xs transition-colors hover:border-primary/40 file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground"
             onChange={(event) => {
               const next = event.target.files?.[0] ?? null;
               setFile(next);
@@ -139,7 +150,7 @@ function ImportDialog() {
           {headers.length > 0 && !importer.data ? (
             <div className="space-y-2">
               <p className="text-xs font-medium">Map columns</p>
-              <div className="max-h-64 space-y-2 overflow-y-auto rounded-[var(--radius-sm)] border p-2">
+              <div className="max-h-64 space-y-2 overflow-y-auto rounded-[var(--radius-md)] border border-border bg-surface p-2.5">
                 {headers.map((header) => (
                   <div key={header} className="grid grid-cols-[1fr_12.5rem] items-center gap-2">
                     <span className="truncate font-mono text-xs" title={header}>
@@ -166,14 +177,13 @@ function ImportDialog() {
                 ))}
               </div>
               {!emailMappedOnce ? (
-                <p className="text-xs text-warning">Map exactly one column to Email.</p>
+                <Callout tone="warning">Map exactly one column to Email.</Callout>
               ) : null}
             </div>
           ) : null}
 
           {importer.data ? (
-            <div className="space-y-2 rounded-[var(--radius-sm)] border bg-muted/40 px-3 py-2 text-xs">
-              <p className="font-medium">Import summary</p>
+            <Callout tone="success" title="Import complete">
               <ul className="space-y-0.5 font-mono">
                 <li>created: {importer.data.created}</li>
                 <li>skipped duplicates: {importer.data.skippedDupes}</li>
@@ -191,7 +201,7 @@ function ImportDialog() {
                   <li>already opted out: {importer.data.suppressedExisting}</li>
                 ) : null}
               </ul>
-              <p className="text-muted-foreground">
+              <p className="opacity-80">
                 {skipValidation
                   ? 'Email validation was skipped for addresses not checked before.'
                   : `Validator: ${importer.data.validator}.`}{' '}
@@ -201,11 +211,11 @@ function ImportDialog() {
                   .join(', ')}
               </p>
               {importer.data.truncated ? (
-                <p className="text-warning">
+                <p className="font-semibold">
                   File was truncated at the row limit — split it and import the rest.
                 </p>
               ) : null}
-            </div>
+            </Callout>
           ) : null}
         </DialogBody>
         <DialogFooter>
@@ -288,6 +298,39 @@ function SuppressDialog({
   );
 }
 
+function Metric({
+  label,
+  value,
+  hint,
+  emphasis,
+}: {
+  label: string;
+  value: number | undefined;
+  hint?: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div>
+      <p className="font-mono text-caption tracking-wider text-muted-foreground uppercase">
+        {label}
+      </p>
+      {value === undefined ? (
+        <Skeleton className="mt-1.5 h-6 w-12" />
+      ) : (
+        <p
+          className={cn(
+            'mt-1 font-mono text-2xl leading-none font-semibold tabular-nums',
+            emphasis ? 'text-primary' : 'text-foreground',
+          )}
+        >
+          {value}
+        </p>
+      )}
+      {hint ? <p className="mt-1.5 text-caption text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
 export function ContactsPage() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<ContactFilter>('all');
@@ -301,6 +344,9 @@ export function ContactsPage() {
     limit: PAGE_SIZE,
     offset,
   });
+  // Scoped by the search but not by the status filter — the chips need to show
+  // what you'd get by switching to them, not what the current filter shows.
+  const { data: stats } = useContactStats({ q: query });
   const contacts = data?.data ?? [];
   const total = data?.meta.total ?? 0;
 
@@ -323,7 +369,30 @@ export function ContactsPage() {
         }
       />
 
-      <div className="space-y-3 px-6 py-4">
+      <PageBody className="space-y-3">
+        <Card>
+          <CardBody className="space-y-4">
+            <div className="flex flex-wrap gap-x-8 gap-y-3">
+              <Metric label="Contacts" value={stats?.all} />
+              <Metric
+                label="Ready to send"
+                value={stats?.ready}
+                hint="valid, never emailed"
+                emphasis
+              />
+              <Metric label="Contacted" value={stats?.sent} hint="at least one send" />
+              <Metric label="Suppressed" value={stats?.suppressed} hint="never emailed again" />
+            </div>
+            <div className="border-t border-border pt-4">
+              {stats ? (
+                <ListCompositionBar stats={stats} />
+              ) : (
+                <Skeleton className="h-2.5 w-full rounded-full" />
+              )}
+            </div>
+          </CardBody>
+        </Card>
+
         <div className="flex flex-wrap items-center gap-2">
           <Input
             placeholder="Search email, name, company, title…"
@@ -334,33 +403,25 @@ export function ContactsPage() {
               setOffset(0);
             }}
           />
-          <div className="flex flex-wrap gap-1">
-            {FILTERS.map((filter) => (
-              <button
-                key={filter.value}
-                type="button"
-                onClick={() => {
-                  setStatus(filter.value);
-                  setOffset(0);
-                }}
-                className={cn(
-                  'rounded-full border px-2.5 py-1 text-xs transition-colors',
-                  status === filter.value
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border text-muted-foreground hover:bg-accent',
-                )}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            aria-label="Filter contacts by status"
+            value={status}
+            onChange={(next) => {
+              setStatus(next);
+              setOffset(0);
+            }}
+            options={FILTERS.map((filter) => ({
+              ...filter,
+              count: stats?.[filter.value],
+            }))}
+          />
         </div>
 
         <ErrorBanner error={error} />
 
         <Card className="overflow-hidden">
           {isLoading ? (
-            <p className="px-4 py-6 text-xs text-muted-foreground">Loading…</p>
+            <TableSkeleton cols={7} />
           ) : contacts.length === 0 ? (
             <EmptyState
               title="No contacts match"
@@ -444,32 +505,13 @@ export function ContactsPage() {
           )}
         </Card>
 
-        {total > PAGE_SIZE ? (
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">
-              {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-              >
-                Previous
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={offset + PAGE_SIZE >= total}
-                onClick={() => setOffset(offset + PAGE_SIZE)}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </div>
+        <Pagination
+          offset={offset}
+          pageSize={PAGE_SIZE}
+          total={total}
+          onOffsetChange={setOffset}
+        />
+      </PageBody>
 
       {sendTo ? (
         <SendModal

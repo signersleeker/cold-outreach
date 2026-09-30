@@ -17,7 +17,11 @@ export interface CompaniesQuery {
 export const queryKeys = {
   session: ['session'] as const,
   dashboard: ['dashboard'] as const,
+  sendActivity: (days: number) => ['dashboard', 'activity', days] as const,
   contacts: (params: ContactsQuery) => ['contacts', params] as const,
+  // Under the 'contacts' prefix so the existing invalidations already cover it.
+  contactStats: (params: { q?: string; companyId?: string }) =>
+    ['contacts', 'stats', params] as const,
   contact: (id: string) => ['contacts', id] as const,
   companies: (params: CompaniesQuery) => ['companies', params] as const,
   company: (id: string) => ['companies', id] as const,

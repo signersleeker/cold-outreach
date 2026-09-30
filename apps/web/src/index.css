@@ -1,59 +1,76 @@
-@import 'tailwindcss';
+/* Taddar brand kit v1.0. taddar.css is vendored verbatim from the brand team
+   (source of truth: docs/brand/Taddar_Brand_Guidelines_v1.0.pdf) and imports
+   Tailwind itself, so it is the only Tailwind entry point. Don't hand-edit it —
+   replace the file when the kit is reissued and re-check the overrides below. */
+@import './taddar.css';
 
-/* Design tokens ported from kinnatic/apps/frontend so this app looks like the
-   rest of the estate. The success/warning/danger triple maps directly onto the
-   ready / risky / invalid validation states and onto gate warnings vs blockers. */
+/* App-only tokens the kit doesn't ship. The kit calls it `destructive`; this app
+   has always spoken in `danger`, and the success/warning/danger triple maps onto
+   the ready / risky / invalid validation states and onto gate warnings vs
+   blockers. The `-subtle` tints back the badges and the error banner. */
 @theme inline {
-  --color-background: oklch(0.99 0 0);
-  --color-foreground: oklch(0.2 0.02 255);
-  --color-muted: oklch(0.96 0 0);
-  --color-muted-foreground: oklch(0.5 0.02 255);
-  --color-border: oklch(0.9 0 0);
-  --color-input: oklch(0.88 0 0);
-  --color-ring: oklch(0.55 0.1 255);
-  --color-primary: oklch(0.35 0.08 255);
-  --color-primary-foreground: oklch(1 0 0);
-  --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.2 0.02 255);
-  --color-secondary: oklch(0.96 0 0);
-  --color-secondary-foreground: oklch(0.2 0.02 255);
-  --color-accent: oklch(0.96 0 0);
-  --color-accent-foreground: oklch(0.2 0.02 255);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+}
 
-  --color-success: oklch(0.52 0.11 155);
-  --color-success-foreground: oklch(1 0 0);
-  --color-success-subtle: oklch(0.96 0.03 155);
-  --color-warning: oklch(0.58 0.13 65);
-  --color-warning-foreground: oklch(1 0 0);
-  --color-warning-subtle: oklch(0.96 0.04 75);
-  --color-danger: oklch(0.53 0.19 25);
-  --color-danger-foreground: oklch(1 0 0);
-  --color-danger-subtle: oklch(0.96 0.03 25);
-
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+@theme {
+  /* Matches the kit's h3 tracking; applied to the dense headings below. */
   --tracking-heading: -0.015em;
+
+  /* Chart ramp. Deliberately NOT the UI status tokens: --warning (#B45309) sits
+     only 8.6 ΔE from --danger (#B42318), which is fine for text on a tinted
+     background but indistinguishable as two touching fills in the composition
+     bar. Butter-600 moves `risky` clear of `invalid` (worst adjacent pair 19.9
+     ΔE normal vision, 10.8 under protanopia). Validated with the dataviz
+     palette checker against a white card surface; the two residual notes —
+     butter at 2.88:1 and the neutral grey having no chroma — are relieved by
+     the legend, which carries a label and a count for every segment, so no
+     value is ever conveyed by colour alone. */
+  --color-chart-sends: #4f4fc7;
+  --color-chart-valid: #15803d;
+  --color-chart-risky: #b39545;
+  --color-chart-invalid: #b42318;
+  --color-chart-unverified: #797889;
+}
+
+:root {
+  --danger: var(--destructive);
+  --danger-foreground: var(--destructive-foreground);
+  --danger-subtle: #fef3f2;
+  --success-foreground: #ffffff;
+  --success-subtle: #ecfdf3;
+  --warning-foreground: #ffffff;
+  --warning-subtle: #fffaeb;
+}
+
+/* The app doesn't ship a dark-mode toggle yet, but the kit is dark-ready, so
+   keep these in step rather than letting `.dark` fall back to light tints. */
+.dark {
+  --danger: #fda29b;
+  --danger-foreground: #1a1633;
+  --danger-subtle: #3f1a17;
+  --success-foreground: #1a1633;
+  --success-subtle: #14321f;
+  --warning-foreground: #1a1633;
+  --warning-subtle: #3a2a10;
 }
 
 @layer base {
-  * {
-    border-color: var(--color-border);
-  }
   html {
     -webkit-text-size-adjust: 100%;
   }
+  /* Dense by default: this is an internal tool, not a landing page, so body text
+     stays at 14px rather than the kit's 16px `text-body`. The kit's type scale
+     (text-display … text-caption) is still there for marketing surfaces. */
   body {
     margin: 0;
-    background: var(--color-background);
-    color: var(--color-foreground);
-    font-family: var(--font-sans);
     font-size: 14px;
     line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
   }
   h1,
   h2,
@@ -65,7 +82,6 @@
   button {
     font: inherit;
   }
-  /* Dense by default: this is an internal tool, not a landing page. */
   table {
     border-collapse: collapse;
     width: 100%;

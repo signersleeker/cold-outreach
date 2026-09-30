@@ -21,6 +21,7 @@ from app.contacts.constants import (
     VALIDATION_INVALID,
     VALIDATION_PENDING,
     VALIDATION_RISKY,
+    VALIDATION_UNKNOWN,
     VALIDATION_VALID,
 )
 from app.contacts.contact import Contact
@@ -139,6 +140,58 @@ def _apply_filter(query, status: str):  # noqa: ANN001 - SQLAlchemy Select gener
     return query
 
 
+def _apply_scope(query, *, q: str, company_id: uuid.UUID | None):  # noqa: ANN001, ANN202
+    """The company/search narrowing that applies before the status filter."""
+    if company_id is not None:
+        query = query.where(Contact.company_id == company_id)
+
+    if q.strip():
+        pattern = f"%{q.strip().lower()}%"
+        query = query.where(
+            or_(
+                func.lower(Contact.email).like(pattern),
+                func.lower(Contact.first_name).like(pattern),
+                func.lower(Contact.last_name).like(pattern),
+                func.lower(Contact.title).like(pattern),
+                Contact.company_id.in_(
+                    select(Company.id).where(func.lower(Company.name).like(pattern))
+                ),
+            )
+        )
+    return query
+
+
+def stats(db: Session, *, q: str = "", company_id: uuid.UUID | None = None) -> dict[str, int]:
+    """Row counts per status filter, under the same scope the list is using.
+
+    Every count goes through `_apply_filter`, the same function the list query
+    uses, so a chip reading "Ready 42" cannot disagree with the 42 rows you get
+    when you click it. `validation_*` are raw status tallies for the list
+    composition bar, which is a different question from `ready` (that one also
+    requires unsent and unsuppressed).
+    """
+    base = _apply_scope(select(func.count()).select_from(Contact), q=q, company_id=company_id)
+
+    counts = {
+        name: db.scalar(_apply_filter(base, name)) or 0
+        for name in ("all", "ready", "risky", "invalid", "pending", "sent", "suppressed")
+    }
+    counts["validation_valid"] = (
+        db.scalar(base.where(Contact.validation_status == VALIDATION_VALID)) or 0
+    )
+    # pending and unknown both mean "no verdict", and the UI shows them as one
+    # Unverified segment, so they are summed here rather than in the client.
+    counts["validation_unverified"] = (
+        db.scalar(
+            base.where(
+                Contact.validation_status.in_([VALIDATION_PENDING, VALIDATION_UNKNOWN])
+            )
+        )
+        or 0
+    )
+    return counts
+
+
 def search(
     db: Session,
     *,
@@ -148,26 +201,12 @@ def search(
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Contact], int]:
-    query = select(Contact).options(joinedload(Contact.company_ref))
-    count_query = select(func.count()).select_from(Contact)
-
-    if company_id is not None:
-        query = query.where(Contact.company_id == company_id)
-        count_query = count_query.where(Contact.company_id == company_id)
-
-    if q.strip():
-        pattern = f"%{q.strip().lower()}%"
-        condition = or_(
-            func.lower(Contact.email).like(pattern),
-            func.lower(Contact.first_name).like(pattern),
-            func.lower(Contact.last_name).like(pattern),
-            func.lower(Contact.title).like(pattern),
-            Contact.company_id.in_(
-                select(Company.id).where(func.lower(Company.name).like(pattern))
-            ),
-        )
-        query = query.where(condition)
-        count_query = count_query.where(condition)
+    query = _apply_scope(
+        select(Contact).options(joinedload(Contact.company_ref)), q=q, company_id=company_id
+    )
+    count_query = _apply_scope(
+        select(func.count()).select_from(Contact), q=q, company_id=company_id
+    )
 
     query = _apply_filter(query, status)
     count_query = _apply_filter(count_query, status)

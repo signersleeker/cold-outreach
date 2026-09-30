@@ -1,12 +1,15 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { ErrorBanner, PageHeader } from '@/components/AppLayout';
+import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { IndustrySelect } from '@/components/IndustrySelect';
 import { TemplateGroupsPanel } from '@/components/TemplateGroupsPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, Input, Textarea } from '@/components/ui/input';
+import { Segmented } from '@/components/ui/segmented';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useTemplateMutations, useTemplates } from '@/hooks';
 import type { Template } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -76,22 +79,15 @@ export function TemplatesPage() {
         }
         actions={
           <>
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant={section === 'templates' ? 'default' : 'outline'}
-                onClick={() => setSection('templates')}
-              >
-                Templates
-              </Button>
-              <Button
-                size="sm"
-                variant={section === 'groups' ? 'default' : 'outline'}
-                onClick={() => setSection('groups')}
-              >
-                Groups
-              </Button>
-            </div>
+            <Segmented
+              aria-label="Templates or groups"
+              value={section}
+              onChange={setSection}
+              options={[
+                { value: 'templates', label: 'Templates' },
+                { value: 'groups', label: 'Groups' },
+              ]}
+            />
             {section === 'templates' ? (
               <Button variant="outline" onClick={() => setSelectedId('new')}>
                 <Plus />
@@ -106,20 +102,26 @@ export function TemplatesPage() {
 
       {section === 'templates' ? (
 
-      <div className="grid gap-4 px-6 py-4 lg:grid-cols-[14rem_1fr]">
+      <PageBody className="grid gap-4 lg:grid-cols-[14rem_1fr]">
         <Card className="h-fit overflow-hidden">
           {isLoading ? (
-            <p className="px-3 py-3 text-xs text-muted-foreground">Loading…</p>
+            <div className="space-y-3 p-3">
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-3.5" style={{ opacity: 1 - i * 0.15 }} />
+              ))}
+            </div>
           ) : (
-            <ul className="divide-y">
+            <ul className="divide-y divide-border">
               {templates.map((template: Template) => (
                 <li key={template.id}>
                   <button
                     type="button"
                     onClick={() => setSelectedId(template.id)}
                     className={cn(
-                      'w-full px-3 py-2 text-left text-sm transition-colors',
-                      selectedId === template.id ? 'bg-accent font-medium' : 'hover:bg-accent/60',
+                      'relative w-full px-3 py-2.5 text-left text-sm transition-colors',
+                      selectedId === template.id
+                        ? 'bg-accent font-semibold text-accent-foreground before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary'
+                        : 'hover:bg-surface',
                     )}
                   >
                     <span>
@@ -210,8 +212,7 @@ export function TemplatesPage() {
                 />
               </Field>
 
-              <div className="space-y-1.5 rounded-[var(--radius-sm)] border bg-muted/40 px-3 py-2 text-xs">
-                <p className="font-medium">Merge fields</p>
+              <Callout tone="neutral" title="Merge fields">
                 <p className="font-mono text-muted-foreground">
                   {MERGE_VARS.map((v) => `{{${v}}}`).join('  ')}
                 </p>
@@ -220,20 +221,23 @@ export function TemplatesPage() {
                   the send. That is deliberate — a raw <code>{'{{company}}'}</code> must never go
                   out.
                 </p>
-                {unknown.length > 0 ? (
-                  <p className="text-warning">
-                    Unknown tag{unknown.length === 1 ? '' : 's'}:{' '}
-                    <span className="font-mono">{unknown.map((v) => `{{${v}}}`).join(' ')}</span> —
-                    these will never be filled and will block every send.
-                  </p>
-                ) : null}
-              </div>
+              </Callout>
+
+              {unknown.length > 0 ? (
+                <Callout
+                  tone="warning"
+                  title={`Unknown tag${unknown.length === 1 ? '' : 's'} in this template`}
+                >
+                  <span className="font-mono">{unknown.map((v) => `{{${v}}}`).join(' ')}</span> —
+                  these will never be filled and will block every send.
+                </Callout>
+              ) : null}
 
               <ErrorBanner error={create.error ?? update.error ?? remove.error} />
             </CardBody>
           </Card>
         ) : null}
-      </div>
+      </PageBody>
       ) : null}
     </>
   );

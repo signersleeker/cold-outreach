@@ -224,6 +224,36 @@ export interface Dashboard {
   lastInboxSyncAt: string | null;
 }
 
+export interface ActivityDay {
+  date: string;
+  /** Everything that left the mailbox that day, whatever the outcome. */
+  sent: number;
+  /** Subsets of `sent`, not separate columns. */
+  bounced: number;
+  stopped: number;
+}
+
+export interface SendActivity {
+  days: ActivityDay[];
+  dailyCap: number;
+  totalSent: number;
+  busiestDay: number;
+}
+
+/** Counts behind the Contacts header. Keys mirror the status filters. */
+export interface ContactStats {
+  all: number;
+  ready: number;
+  risky: number;
+  invalid: number;
+  pending: number;
+  sent: number;
+  suppressed: number;
+  validationValid: number;
+  /** pending + unknown — both mean "no verdict yet". */
+  validationUnverified: number;
+}
+
 export interface ImportSummary {
   created: number;
   skippedDupes: number;
@@ -291,6 +321,7 @@ export const api = {
 
   // dashboard
   dashboard: () => unwrap<Dashboard>('/api/v1/dashboard'),
+  sendActivity: (days = 30) => unwrap<SendActivity>(`/api/v1/dashboard/activity?days=${days}`),
   syncInbox: () => unwrap<InboxSyncSummary>('/api/v1/inbox/sync', { method: 'POST' }),
 
   // contacts
@@ -310,6 +341,12 @@ export const api = {
     return unwrapList<Contact[], { total: number; limit: number; offset: number }>(
       `/api/v1/contacts?${query}`,
     );
+  },
+  contactStats: (params: { q?: string; companyId?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.q) query.set('q', params.q);
+    if (params.companyId) query.set('companyId', params.companyId);
+    return unwrap<ContactStats>(`/api/v1/contacts/stats?${query}`);
   },
   contact: (id: string) => unwrap<Contact>(`/api/v1/contacts/${id}`),
   createContact: (input: NewContact) =>

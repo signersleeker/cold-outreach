@@ -1,10 +1,12 @@
-import { Trash2 } from 'lucide-react';
+import { ShieldBan, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { ErrorBanner, PageHeader } from '@/components/AppLayout';
+import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, EmptyState } from '@/components/ui/card';
+import { Callout } from '@/components/ui/callout';
+import { Card, CardBody, EmptyState } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
 import { useSuppressionMutations, useSuppressions } from '@/hooks';
 import { formatDateTime, plural } from '@/lib/format';
@@ -25,8 +27,9 @@ export function SuppressionsPage() {
         description={`${plural(total, 'address', 'addresses')} that will never be emailed again. This list is the authority — the send gate reads it directly.`}
       />
 
-      <div className="space-y-3 px-6 py-4">
-        <Card className="p-3">
+      <PageBody className="space-y-3">
+        <Card>
+          <CardBody className="space-y-2 p-3.5">
           <form
             className="flex flex-wrap items-center gap-2"
             onSubmit={(event) => {
@@ -51,16 +54,16 @@ export function SuppressionsPage() {
               Works for addresses that are not imported yet.
             </p>
           </form>
-          <div className="mt-2">
-            <ErrorBanner error={add.error ?? remove.error} />
-          </div>
+          <ErrorBanner error={add.error ?? remove.error} />
+          </CardBody>
         </Card>
 
         <Card className="overflow-hidden">
           {isLoading ? (
-            <p className="px-4 py-6 text-xs text-muted-foreground">Loading…</p>
+            <TableSkeleton cols={5} />
           ) : rows.length === 0 ? (
             <EmptyState
+              icon={ShieldBan}
               title="No suppressions"
               description="Unsubscribes, stop replies and hard bounces land here automatically."
             />
@@ -109,11 +112,11 @@ export function SuppressionsPage() {
           )}
         </Card>
 
-        <p className="text-xs text-muted-foreground">
+        <Callout tone="neutral">
           Removing a suppression is never automatic — re-importing a CSV or syncing the inbox will
           not undo an opt-out.
-        </p>
-      </div>
+        </Callout>
+      </PageBody>
     </>
   );
 }

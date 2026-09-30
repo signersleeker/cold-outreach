@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ErrorBanner, PageHeader } from '@/components/AppLayout';
+import { Building2 } from 'lucide-react';
+import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { NewCompanyDialog } from '@/components/NewCompanyDialog';
-import { Button } from '@/components/ui/button';
 import { Card, EmptyState } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/pagination';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
 import { useCompanies } from '@/hooks';
 import { formatRelative, plural, websiteHref } from '@/lib/format';
@@ -40,7 +42,7 @@ export function CompaniesPage() {
         actions={<NewCompanyDialog />}
       />
 
-      <div className="space-y-3 px-6 py-4">
+      <PageBody className="space-y-3">
       <Input
         value={q}
         onChange={(event) => setQ(event.target.value)}
@@ -52,9 +54,10 @@ export function CompaniesPage() {
 
       <Card className="overflow-hidden">
         {isLoading ? (
-          <p className="px-4 py-6 text-xs text-muted-foreground">Loading…</p>
+          <TableSkeleton cols={5} />
         ) : companies.length === 0 ? (
           <EmptyState
+            icon={Building2}
             title="No companies yet"
             description="Create a company, import contacts with a company column, or set a company on a contact."
             action={<NewCompanyDialog />}
@@ -111,32 +114,8 @@ export function CompaniesPage() {
         )}
       </Card>
 
-      {total > PAGE_SIZE ? (
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">
-            {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-            >
-              Previous
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={offset + PAGE_SIZE >= total}
-              onClick={() => setOffset(offset + PAGE_SIZE)}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      </div>
+      <Pagination offset={offset} pageSize={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
+      </PageBody>
     </>
   );
 }

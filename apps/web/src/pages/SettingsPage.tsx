@@ -1,12 +1,14 @@
 import { Link2, Unlink } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ErrorBanner, PageHeader } from '@/components/AppLayout';
+import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   useAppSettings,
   useDisconnectGmail,
@@ -40,7 +42,17 @@ export function SettingsPage() {
     return (
       <>
         <PageHeader title="Settings" />
-        <p className="px-6 py-4 text-xs text-muted-foreground">Loading…</p>
+        <PageBody className="max-w-3xl">
+          {[0, 1, 2].map((i) => (
+            <Card key={i} className="p-4">
+              <Skeleton className="h-3.5 w-32" />
+              <div className="mt-4 space-y-2.5">
+                <Skeleton className="h-3 w-2/3" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </Card>
+          ))}
+        </PageBody>
       </>
     );
   }
@@ -56,22 +68,16 @@ export function SettingsPage() {
     <>
       <PageHeader title="Settings" />
 
-      <div className="max-w-3xl space-y-4 px-6 py-4">
+      <PageBody className="max-w-3xl">
         {gmailResult === 'connected' ? (
-          <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-success/30 bg-success-subtle px-3 py-2 text-xs text-success">
-            <span>Gmail connected.</span>
-            <button type="button" className="underline" onClick={() => setParams({})}>
-              dismiss
-            </button>
-          </div>
+          <Callout tone="success" onDismiss={() => setParams({})}>
+            Gmail connected.
+          </Callout>
         ) : null}
         {gmailResult === 'error' ? (
-          <div className="flex items-start justify-between gap-3 rounded-[var(--radius-sm)] border border-danger/30 bg-danger-subtle px-3 py-2 text-xs text-danger">
-            <span>{gmailMessage || 'Connecting Gmail failed.'}</span>
-            <button type="button" className="underline" onClick={() => setParams({})}>
-              dismiss
-            </button>
-          </div>
+          <Callout tone="danger" onDismiss={() => setParams({})}>
+            {gmailMessage || 'Connecting Gmail failed.'}
+          </Callout>
         ) : null}
 
         <Card>
@@ -104,21 +110,25 @@ export function SettingsPage() {
                 {gmail.lastError ? <p className="text-danger">{gmail.lastError}</p> : null}
 
                 {!gmail.canReadSignature ? (
-                  <div className="space-y-2 rounded-[var(--radius-sm)] border border-warning/30 bg-warning-subtle px-3 py-2 text-warning">
-                    <p>
-                      This connection cannot read your Gmail signature. Disconnect and connect
-                      again to grant the settings permission — then every send can carry the same
-                      HTML signature you use in Gmail.
-                    </p>
-                    <Button
-                      variant="outline"
-                      disabled={disconnect.isPending}
-                      onClick={() => disconnect.mutate()}
-                    >
-                      <Unlink />
-                      Disconnect to reconnect
-                    </Button>
-                  </div>
+                  <Callout
+                    tone="warning"
+                    title="Signature permission missing"
+                    action={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={disconnect.isPending}
+                        onClick={() => disconnect.mutate()}
+                      >
+                        <Unlink />
+                        Disconnect to reconnect
+                      </Button>
+                    }
+                  >
+                    This connection cannot read your Gmail signature. Disconnect and connect again
+                    to grant the settings permission — then every send can carry the same HTML
+                    signature you use in Gmail.
+                  </Callout>
                 ) : (
                   <div className="space-y-2">
                     <p className="text-muted-foreground">
@@ -133,7 +143,7 @@ export function SettingsPage() {
                         className="h-40 w-full rounded-[var(--radius-sm)] border bg-white"
                       />
                     ) : (
-                      <p className="rounded-[var(--radius-sm)] border border-dashed px-3 py-2 text-muted-foreground">
+                      <p className="rounded-[var(--radius-md)] border border-dashed border-border bg-surface px-3 py-2.5 text-muted-foreground">
                         No signature is set on this mailbox in Gmail yet.
                       </p>
                     )}
@@ -158,10 +168,10 @@ export function SettingsPage() {
                   to each send.
                 </p>
                 {gmail && !gmail.configured ? (
-                  <p className="text-danger">
+                  <Callout tone="danger" title="OAuth credentials not configured">
                     GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set in apps/api/.env. See the
                     README for the Google Cloud walkthrough.
-                  </p>
+                  </Callout>
                 ) : null}
                 {/* A real anchor, not a fetch: /auth/google issues a 302 to
                     Google's consent screen, so the browser must navigate. */}
@@ -233,15 +243,15 @@ export function SettingsPage() {
               />
             </Field>
             {overCap ? (
-              <p className="rounded-[var(--radius-sm)] bg-warning-subtle px-2.5 py-2 text-xs text-warning">
+              <Callout tone="warning" title="Above the recommended cap">
                 Above {settings.recommendedDailyCap}/day from a single mailbox is the fastest way
                 to damage your domain reputation. The low cap is the product, not a limitation.
-              </p>
+              </Callout>
             ) : null}
             <ErrorBanner error={update.error} />
           </CardBody>
         </Card>
-      </div>
+      </PageBody>
     </>
   );
 }

@@ -1,7 +1,7 @@
 import { Ban, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ErrorBanner, PageHeader } from '@/components/AppLayout';
+import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
 import { IndustrySelect } from '@/components/IndustrySelect';
 import { NewContactDialog } from '@/components/NewContactDialog';
@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle, EmptyState } from '@/components/ui/card';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Field, Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/pagination';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
 import { useCompany, useContacts, useSuppressContact, useUpdateCompany } from '@/hooks';
 import type { Contact } from '@/lib/api';
@@ -129,7 +131,7 @@ export function CompanyDetailPage() {
         }
       />
 
-      <div className="space-y-3 px-6 py-4">
+      <PageBody className="space-y-3">
       <ErrorBanner error={error} />
 
       {company ? (
@@ -200,7 +202,7 @@ export function CompanyDetailPage() {
 
       <Card className="overflow-hidden">
         {companyQuery.isLoading || contactsQuery.isLoading ? (
-          <p className="px-4 py-6 text-xs text-muted-foreground">Loading…</p>
+          <TableSkeleton cols={6} />
         ) : contacts.length === 0 ? (
           <EmptyState
             title="No contacts at this company"
@@ -272,32 +274,8 @@ export function CompanyDetailPage() {
         )}
       </Card>
 
-      {total > PAGE_SIZE ? (
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">
-            {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-            >
-              Previous
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={offset + PAGE_SIZE >= total}
-              onClick={() => setOffset(offset + PAGE_SIZE)}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      </div>
+      <Pagination offset={offset} pageSize={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
+      </PageBody>
 
       {sendTo ? (
         <SendModal
