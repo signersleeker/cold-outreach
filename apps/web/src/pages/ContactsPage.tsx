@@ -1,6 +1,6 @@
 import { Ban, Send, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { BulkSequenceDialog } from '@/components/BulkSequenceDialog';
 import { ListCompositionBar } from '@/components/charts/ListCompositionBar';
@@ -356,8 +356,17 @@ function Metric({
 }
 
 export function ContactsPage() {
+  const [searchParams] = useSearchParams();
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<ContactFilter>('all');
+  // Seeded from ?status= so the dashboard's tiles can land on the list they name.
+  // Read once, on mount: after that the chips own the filter, and re-reading the
+  // URL would undo a click the operator just made.
+  const [status, setStatus] = useState<ContactFilter>(() => {
+    const requested = searchParams.get('status');
+    return FILTERS.some((filter) => filter.value === requested)
+      ? (requested as ContactFilter)
+      : 'all';
+  });
   const [industry, setIndustry] = useState('');
   const [group, setGroup] = useState('');
   const [offset, setOffset] = useState(0);

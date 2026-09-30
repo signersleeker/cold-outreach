@@ -20,6 +20,10 @@ export const queryKeys = {
   session: ['session'] as const,
   dashboard: ['dashboard'] as const,
   sendActivity: (days: number) => ['dashboard', 'activity', days] as const,
+  // Under the 'dashboard' prefix so the existing send/sync invalidations reach them.
+  sentCalendar: (year: number, month: number) =>
+    ['dashboard', 'sent', 'calendar', year, month] as const,
+  sentEmails: (date: string) => ['dashboard', 'sent', 'day', date] as const,
   contacts: (params: ContactsQuery) => ['contacts', params] as const,
   // Under the 'contacts' prefix so the existing invalidations already cover it.
   contactStats: (params: Pick<ContactsQuery, 'q' | 'companyId' | 'industry' | 'group'>) =>

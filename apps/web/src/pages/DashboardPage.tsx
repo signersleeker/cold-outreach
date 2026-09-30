@@ -1,41 +1,87 @@
-import { Inbox, RefreshCw } from 'lucide-react';
+import { Inbox, MailCheck, RefreshCw, ShieldBan, Users } from 'lucide-react';
+import type * as React from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
-import { FollowUpCalendar } from '@/components/FollowUpCalendar';
+import { OutreachCalendar } from '@/components/OutreachCalendar';
+import { StatTile } from '@/components/StatTile';
+import { StreakBadge, TodayPanel } from '@/components/TodayPanel';
+import { ListCompositionBar } from '@/components/charts/ListCompositionBar';
 import { SendActivityChart } from '@/components/charts/SendActivityChart';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
-import { Card, CardBody, CardHeader, CardTitle, StatTile } from '@/components/ui/card';
+import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, StatSkeleton } from '@/components/ui/skeleton';
-import { useDashboard, useSendActivity, useSyncInbox } from '@/hooks';
-import { formatDateTime, formatRelative, plural } from '@/lib/format';
+import { useContactStats, useDashboard, useSendActivity, useSyncInbox } from '@/hooks';
+import { formatDateTime, formatPct, formatRelative, plural } from '@/lib/format';
 import { SUPPRESSION_REASON_LABELS } from '@/lib/gates';
+import { deliverabilityTone, runwayDays, sendMetrics } from '@/lib/metrics';
+
+/** The window the headline figures are read over. Fixed at 30 days on purpose:
+ *  the chart's range toggle changes what you're looking at, not what the KPIs
+ *  above it mean, so "vs prior 7 days" can't quietly become something else. */
+const METRIC_WINDOW = 30;
+
+const RANGES = [
+  { value: '7', label: '7 days' },
+  { value: '30', label: '30 days' },
+  { value: '90', label: '90 days' },
+] as const;
+
+type Range = (typeof RANGES)[number]['value'];
+
+/** A labelled band. The old page was six cards of identical weight, which is why
+ *  it read as a wall; the rules give the eye somewhere to stop and say what the
+ *  next group of cards is for. */
+function Section({
+  title,
+  id,
+  children,
+}: {
+  title: string;
+  id?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    // scroll-mt clears the sticky page header when the hero's links jump here.
+    <section id={id} className="scroll-mt-20 space-y-3">
+      <div className="flex items-center gap-3">
+        <h2 className="font-mono text-caption tracking-wider text-muted-foreground uppercase">
+          {title}
+        </h2>
+        <span aria-hidden className="h-px flex-1 bg-border" />
+      </div>
+      {children}
+    </section>
+  );
+}
 
 function DashboardSkeleton() {
   return (
-    <PageBody>
+    <PageBody className="space-y-5">
+      <Skeleton className="h-44 w-full rounded-[var(--radius-lg)]" />
       <StatSkeleton />
-      <div className="grid gap-4 lg:grid-cols-2">
-        {[0, 1].map((i) => (
-          <Card key={i} className="p-4">
-            <Skeleton className="h-3.5 w-28" />
-            <div className="mt-4 space-y-2.5">
-              <Skeleton className="h-3 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-              <Skeleton className="h-3 w-2/3" />
-            </div>
-          </Card>
-        ))}
-      </div>
+      <Card className="p-4">
+        <Skeleton className="h-3.5 w-28" />
+        <Skeleton className="mt-4 h-36 w-full" />
+      </Card>
     </PageBody>
   );
 }
 
 export function DashboardPage() {
   const { data, isLoading, error } = useDashboard();
-  const { data: activity } = useSendActivity(30);
+  const [range, setRange] = useState<Range>('30');
+  // The headline figures always read over METRIC_WINDOW; the chart follows the
+  // toggle. Both go through the same cached query when they agree.
+  const { data: metricActivity } = useSendActivity(METRIC_WINDOW);
+  const { data: activity } = useSendActivity(Number(range));
+  const { data: stats } = useContactStats();
   const sync = useSyncInbox();
+
+  const metrics = metricActivity ? sendMetrics(metricActivity) : null;
 
   if (isLoading) {
     return (
@@ -56,29 +102,36 @@ export function DashboardPage() {
     );
   }
 
-  const remaining = Math.max(0, data.dailyCap - data.sendsToday);
-  const capTone =
-    data.sendsToday >= data.dailyCap ? 'danger' : remaining <= 3 ? 'warning' : 'default';
+  const runway = metrics ? runwayDays(data.contactsReady, metrics.pace) : null;
+  const delivered = metrics?.deliveredRate ?? null;
+  const suppressionReasons = Object.entries(data.suppressionsByReason);
 
   return (
     <>
       <PageHeader
         title="Dashboard"
-        description={`Today ${data.today} (${data.timezone}). The cap resets at midnight in that timezone.`}
+        // The date, cap and timezone are the Today panel's job now — the header
+        // just says whose mailbox this is.
+        description={
+          data.gmailConnected ? `Sending as ${data.gmailEmail}` : 'No mailbox connected yet'
+        }
         actions={
-          <Button
-            variant="outline"
-            disabled={!data.gmailConnected || sync.isPending}
-            onClick={() => sync.mutate()}
-            title={data.gmailConnected ? 'Check for replies and bounces' : 'Connect Gmail first'}
-          >
-            <RefreshCw className={sync.isPending ? 'animate-spin' : ''} />
-            {sync.isPending ? 'Syncing…' : 'Sync inbox'}
-          </Button>
+          <>
+            {metrics ? <StreakBadge streak={metrics.streak} /> : null}
+            <Button
+              variant="outline"
+              disabled={!data.gmailConnected || sync.isPending}
+              onClick={() => sync.mutate()}
+              title={data.gmailConnected ? 'Check for replies and bounces' : 'Connect Gmail first'}
+            >
+              <RefreshCw className={sync.isPending ? 'animate-spin' : ''} />
+              {sync.isPending ? 'Syncing…' : 'Sync inbox'}
+            </Button>
+          </>
         }
       />
 
-      <PageBody>
+      <PageBody className="space-y-5">
         <ErrorBanner error={sync.error} />
 
         {sync.data ? (
@@ -116,107 +169,179 @@ export function DashboardPage() {
           </Callout>
         ) : null}
 
+        <TodayPanel dashboard={data} />
+
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile
-            label="Sent today"
-            value={`${data.sendsToday}/${data.dailyCap}`}
-            hint={`${plural(remaining, 'send')} left`}
-            tone={capTone}
+            label="Sent this week"
+            value={metrics ? metrics.last7 : '—'}
+            icon={MailCheck}
+            delta={
+              metrics
+                ? { fraction: metrics.weekChange, label: 'vs the prior 7 days', goodWhen: 'up' }
+                : undefined
+            }
+            trend={metrics?.trend}
+            trendLabel="Daily sends, last 14 days"
+            hint={
+              metrics
+                ? `${metrics.pace.toFixed(1)} a day on average · ${metrics.total} in ${METRIC_WINDOW} days`
+                : undefined
+            }
           />
           <StatTile
             label="Ready to send"
             value={data.contactsReady}
-            hint={`${data.contactsTotal} contacts total`}
+            icon={Users}
+            to="/contacts?status=ready"
+            hint={
+              runway === null
+                ? `${data.contactsTotal} contacts total`
+                : runway < 1
+                  ? // Rounding would say "about 0 days", which reads as a bug.
+                    'under a day of pipeline at this pace'
+                  : `about ${plural(Math.round(runway), 'day')} of pipeline at this pace`
+            }
+          />
+          <StatTile
+            label="Delivered clean"
+            value={delivered === null ? '—' : formatPct(delivered)}
+            tone={deliverabilityTone(delivered)}
+            to="/suppressions"
+            hint={
+              delivered === null
+                ? `nothing sent in the last ${METRIC_WINDOW} days`
+                : `${plural(metrics?.bounced ?? 0, 'hard bounce')} in ${METRIC_WINDOW} days`
+            }
           />
           <StatTile
             label="Suppressed"
             value={data.suppressionsTotal}
-            hint="permanent, never re-sent"
-            tone={data.suppressionsTotal > 0 ? 'warning' : 'default'}
-          />
-          <StatTile
-            label="Bounced"
-            value={data.bouncedCount}
-            hint="hard bounces recorded"
-            tone={data.bouncedCount > 0 ? 'danger' : 'default'}
+            icon={ShieldBan}
+            to="/suppressions"
+            hint="permanent — these addresses are never re-sent"
           />
         </div>
 
-        <FollowUpCalendar />
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Sending activity</CardTitle>
-            <span className="font-mono text-caption tracking-wider text-muted-foreground uppercase">
-              last 30 days
-            </span>
-          </CardHeader>
-          <CardBody>
-            {activity ? (
-              <SendActivityChart activity={activity} />
-            ) : (
-              <Skeleton className="h-36 w-full" />
-            )}
-          </CardBody>
-        </Card>
-
-        <div className="grid gap-4 lg:grid-cols-2">
+        <Section title="Momentum">
           <Card>
-            <CardHeader>
-              <CardTitle>Last send</CardTitle>
-              <Badge tone={data.gmailConnected ? 'success' : 'danger'}>
-                {data.gmailConnected ? data.gmailEmail : 'not connected'}
-              </Badge>
+            <CardHeader className="flex-wrap">
+              <CardTitle>Sending activity</CardTitle>
+              <Segmented
+                value={range}
+                onChange={setRange}
+                options={RANGES.map((option) => ({ ...option }))}
+                aria-label="Activity range"
+              />
             </CardHeader>
-            <CardBody className="space-y-1.5 text-xs">
-              {data.lastSend ? (
-                <>
-                  <p className="font-mono text-foreground">{data.lastSend.email}</p>
-                  <p className="text-muted-foreground">{data.lastSend.subject}</p>
-                  <p className="text-muted-foreground">
-                    {formatDateTime(data.lastSend.sentAt)} ({formatRelative(data.lastSend.sentAt)})
-                  </p>
-                </>
+            <CardBody>
+              {activity ? (
+                <SendActivityChart activity={activity} />
               ) : (
-                <p className="text-muted-foreground">Nothing sent yet.</p>
+                <Skeleton className="h-36 w-full" />
               )}
-              <p className="border-t border-border pt-2.5 text-muted-foreground">
-                Inbox last synced {formatRelative(data.lastInboxSyncAt)}.
-              </p>
             </CardBody>
           </Card>
+        </Section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>List health</CardTitle>
-            </CardHeader>
-            <CardBody className="space-y-2 text-xs">
-              {[
-                ['Valid, unsent', data.contactsReady],
-                ['Risky', data.contactsRisky],
-                ['Invalid', data.contactsInvalid],
-                ['Not yet validated', data.contactsPending],
-              ].map(([label, count]) => (
-                <div key={String(label)} className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className="font-mono tabular-nums">{count}</span>
+        <Section title="Pipeline">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>List health</CardTitle>
+                <Link
+                  to="/contacts"
+                  className="text-xs font-semibold text-link hover:underline"
+                >
+                  All contacts
+                </Link>
+              </CardHeader>
+              <CardBody className="space-y-3">
+                {stats ? (
+                  <ListCompositionBar stats={stats} />
+                ) : (
+                  <Skeleton className="h-2.5 w-full rounded-full" />
+                )}
+
+                {data.contactsInvalid > 0 || data.contactsPending > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {data.contactsInvalid > 0 ? (
+                      <Link to="/contacts?status=invalid" className="font-semibold text-link hover:underline">
+                        Fix or drop {plural(data.contactsInvalid, 'invalid address', 'invalid addresses')}
+                      </Link>
+                    ) : null}
+                    {data.contactsInvalid > 0 && data.contactsPending > 0 ? ' · ' : null}
+                    {data.contactsPending > 0 ? (
+                      <Link to="/contacts?status=pending" className="font-semibold text-link hover:underline">
+                        {plural(data.contactsPending, 'address', 'addresses')} still unvalidated
+                      </Link>
+                    ) : null}
+                  </p>
+                ) : null}
+
+                {suppressionReasons.length > 0 ? (
+                  <div className="space-y-2 border-t border-border pt-3">
+                    <p className="font-mono text-caption tracking-wider text-muted-foreground uppercase">
+                      Why they were suppressed
+                    </p>
+                    {suppressionReasons.map(([reason, count]) => (
+                      <div key={reason} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {SUPPRESSION_REASON_LABELS[reason] ?? reason}
+                        </span>
+                        <span className="font-mono tabular-nums">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Mailbox</CardTitle>
+                <Badge tone={data.gmailConnected ? 'success' : 'danger'}>
+                  {data.gmailConnected ? data.gmailEmail : 'not connected'}
+                </Badge>
+              </CardHeader>
+              <CardBody className="space-y-3 text-xs">
+                <div className="space-y-1.5">
+                  <p className="font-mono text-caption tracking-wider text-muted-foreground uppercase">
+                    Last send
+                  </p>
+                  {data.lastSend ? (
+                    <>
+                      <p className="font-mono text-foreground">{data.lastSend.email}</p>
+                      <p className="text-muted-foreground">{data.lastSend.subject}</p>
+                      <p className="text-muted-foreground">
+                        {formatDateTime(data.lastSend.sentAt, data.timezone)} (
+                        {formatRelative(data.lastSend.sentAt)})
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">Nothing sent yet.</p>
+                  )}
                 </div>
-              ))}
-              {Object.keys(data.suppressionsByReason).length > 0 ? (
-                <div className="mt-1 space-y-2 border-t border-border pt-2.5">
-                  {Object.entries(data.suppressionsByReason).map(([reason, count]) => (
-                    <div key={reason} className="flex items-center justify-between">
-                      <span className="text-muted-foreground">
-                        {SUPPRESSION_REASON_LABELS[reason] ?? reason}
-                      </span>
-                      <span className="font-mono tabular-nums">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </CardBody>
-          </Card>
-        </div>
+                <p className="border-t border-border pt-3 text-muted-foreground">
+                  Inbox last synced {formatRelative(data.lastInboxSyncAt)} — replies and bounces are
+                  only picked up when it runs.
+                </p>
+                {metrics && metrics.stopped > 0 ? (
+                  <p className="text-muted-foreground">
+                    {plural(metrics.stopped, 'person', 'people')} asked to stop in the last{' '}
+                    {METRIC_WINDOW} days.
+                  </p>
+                ) : null}
+              </CardBody>
+            </Card>
+          </div>
+        </Section>
+
+        {/* One grid for both halves of the timeline — sends behind, follow-ups
+            ahead. The anchor is what the Today panel's links jump to. */}
+        <Section title="Calendar" id="calendar">
+          <OutreachCalendar />
+        </Section>
       </PageBody>
     </>
   );

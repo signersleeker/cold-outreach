@@ -15,6 +15,17 @@ export function formatDateTime(iso: string | null, timeZone = DEFAULT_TIMEZONE):
   });
 }
 
+/** Wall-clock time only, for rows already grouped under a known day. */
+export function formatTime(iso: string | null, timeZone = DEFAULT_TIMEZONE): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('en-AU', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
 export function formatDate(iso: string | null, timeZone = DEFAULT_TIMEZONE): string {
   if (!iso) return '—';
   // Date-only YYYY-MM-DD: format as a calendar day, not a UTC midnight instant.
@@ -57,6 +68,19 @@ export function formatRelative(iso: string | null): string {
   }
   const formatter = new Intl.RelativeTimeFormat('en-AU', { numeric: 'auto' });
   return formatter.format(-Math.round(seconds / divisor), chosen);
+}
+
+/** A whole percentage from a 0–1 fraction. */
+export function formatPct(fraction: number): string {
+  return `${Math.round(fraction * 100)}%`;
+}
+
+/** A signed percentage change, with a real minus sign rather than a hyphen. A
+ *  change too small to round to a whole percent reads as "flat", never "+0%". */
+export function formatDeltaPct(fraction: number): string {
+  const pct = Math.round(fraction * 100);
+  if (pct === 0) return 'flat';
+  return `${pct > 0 ? '+' : '−'}${Math.abs(pct)}%`;
 }
 
 export function plural(count: number, singular: string, plural?: string): string {

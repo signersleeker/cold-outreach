@@ -91,3 +91,27 @@
 @utility scrollbar-thin {
   scrollbar-width: thin;
 }
+
+/* One entrance beat, for the dashboard hero only: when the data lands the panel
+   assembles instead of snapping in. Deliberately not applied to every card —
+   a page where everything moves is a page that feels slow. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-rise {
+  animation: rise 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise {
+    animation: none;
+  }
+}

@@ -349,6 +349,40 @@ export interface SendActivity {
   busiestDay: number;
 }
 
+export interface SentCalendarDay {
+  /** `YYYY-MM-DD` in the operator timezone. */
+  date: string;
+  sent: number;
+  /** Subsets of `sent`, not separate columns. */
+  bounced: number;
+  stopped: number;
+}
+
+export interface SentCalendar {
+  today: string;
+  timezone: string;
+  dailyCap: number;
+  monthTotal: number;
+  busiestDay: number;
+  days: SentCalendarDay[];
+}
+
+/** One email that actually went out. `subject`/`body` are the sent snapshot. */
+export interface SentEmail {
+  id: string;
+  sentAt: string;
+  status: SendEvent['status'];
+  error: string;
+  subject: string;
+  body: string;
+  gmailMessageId: string;
+  contactId: string;
+  contactEmail: string;
+  contactName: string;
+  company: string;
+  templateName: string;
+}
+
 /** Counts behind the Contacts header. Keys mirror the status filters. */
 export interface ContactStats {
   all: number;
@@ -445,6 +479,10 @@ export const api = {
   // dashboard
   dashboard: () => unwrap<Dashboard>('/api/v1/dashboard'),
   sendActivity: (days = 30) => unwrap<SendActivity>(`/api/v1/dashboard/activity?days=${days}`),
+  sentCalendar: (year: number, month: number) =>
+    unwrap<SentCalendar>(`/api/v1/dashboard/sent/calendar?year=${year}&month=${month}`),
+  sentEmails: (date: string) =>
+    unwrapList<SentEmail[], unknown>(`/api/v1/dashboard/sent?date=${date}`),
   syncInbox: () => unwrap<InboxSyncSummary>('/api/v1/inbox/sync', { method: 'POST' }),
 
   // contacts

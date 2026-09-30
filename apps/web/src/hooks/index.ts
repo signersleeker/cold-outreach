@@ -53,6 +53,21 @@ export const useSendActivity = (days = 30) =>
     refetchInterval: 60_000,
   });
 
+export const useSentCalendar = (year: number, month: number) =>
+  useQuery({
+    queryKey: queryKeys.sentCalendar(year, month),
+    queryFn: () => api.sentCalendar(year, month),
+    refetchInterval: 60_000,
+  });
+
+/** The emails sent on one day. Idle until a day is selected. */
+export const useSentEmails = (date: string | null) =>
+  useQuery({
+    queryKey: queryKeys.sentEmails(date ?? ''),
+    queryFn: () => api.sentEmails(date as string),
+    enabled: Boolean(date),
+  });
+
 export function useSyncInbox() {
   const client = useQueryClient();
   return useMutation({
