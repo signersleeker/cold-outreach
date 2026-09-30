@@ -6,6 +6,7 @@ import uuid
 from pydantic import Field
 
 from app.lib.schemas import CamelModel
+from app.sends.schemas import GateFindingDTO
 
 
 class ContactStatsDTO(CamelModel):
@@ -42,6 +43,8 @@ class ContactDTO(CamelModel):
     suppressed_at: dt.datetime | None
     last_sent_at: dt.datetime | None
     created_at: dt.datetime
+    group_id: uuid.UUID | None = None
+    group_name: str = ""
 
 
 class ContactCreateRequest(CamelModel):
@@ -88,3 +91,53 @@ class ImportSummaryDTO(CamelModel):
 class ImportPreviewDTO(CamelModel):
     headers: list[str]
     suggestions: dict[str, str | None]
+
+
+class AssignmentContactDTO(CamelModel):
+    contact_id: uuid.UUID
+    email: str
+    name: str
+    blockers: list[GateFindingDTO] = []
+    warnings: list[GateFindingDTO] = []
+
+
+class GroupAssignmentPreviewDTO(CamelModel):
+    group_id: uuid.UUID
+    group_name: str
+    template_id: uuid.UUID
+    template_name: str
+    will_send: int
+    sends_today: int
+    daily_cap: int
+    sendable: list[AssignmentContactDTO]
+    blocked: list[AssignmentContactDTO]
+    warnings: list[AssignmentContactDTO]
+
+
+class GroupAssignmentResultDTO(CamelModel):
+    sent: int
+    unassigned: int
+    skipped: list[AssignmentContactDTO]
+    failed: list[AssignmentContactDTO]
+
+
+class GroupAssignmentPreviewRequest(CamelModel):
+    group_id: uuid.UUID
+    contact_ids: list[uuid.UUID] | None = None
+    all_matching: bool = False
+    q: str = ""
+    status: str = "all"
+    industry: str = ""
+    group: str = ""
+    acknowledge: list[str] = []
+
+
+class GroupAssignmentRequest(CamelModel):
+    group_id: uuid.UUID | None = None
+    contact_ids: list[uuid.UUID] | None = None
+    all_matching: bool = False
+    q: str = ""
+    status: str = "all"
+    industry: str = ""
+    group: str = ""
+    acknowledge: list[str] = []

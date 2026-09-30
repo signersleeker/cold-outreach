@@ -26,9 +26,7 @@ export const GATE_LABELS: Record<string, string> = {
   validation_unknown: 'Validation inconclusive',
   consumer_domain: 'Personal mailbox',
   missing_company: 'No company',
-  missing_title: 'No title',
   multiple_links: 'Multiple links',
-  no_source_recorded: 'No source recorded',
 };
 
 export const gateLabel = (code: string): string =>

@@ -73,7 +73,7 @@ export const useContacts = (params: ContactsQuery) =>
   });
 
 export const useContactStats = (
-  params: Pick<ContactsQuery, 'q' | 'companyId' | 'industry'> = {},
+  params: Pick<ContactsQuery, 'q' | 'companyId' | 'industry' | 'group'> = {},
 ) =>
   useQuery({
     queryKey: queryKeys.contactStats(params),
@@ -312,6 +312,33 @@ export function useEnrollFollowUp() {
       client.invalidateQueries({ queryKey: ['follow-ups'] });
       client.invalidateQueries({ queryKey: queryKeys.contactFollowUp(enrollment.contactId) });
       client.invalidateQueries({ queryKey: queryKeys.dashboard });
+      client.invalidateQueries({ queryKey: ['send-preview'] });
+    },
+  });
+}
+
+export function useGroupAssignmentPreview(
+  input: Parameters<typeof api.previewGroupAssignment>[0],
+  enabled: boolean,
+) {
+  const acknowledge = [...input.acknowledge].sort();
+  return useQuery({
+    queryKey: queryKeys.groupAssignmentPreview({ ...input, acknowledge }),
+    queryFn: () => api.previewGroupAssignment({ ...input, acknowledge }),
+    enabled,
+    staleTime: 0,
+  });
+}
+
+export function useApplyGroupAssignment() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: api.applyGroupAssignment,
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['contacts'] });
+      client.invalidateQueries({ queryKey: ['follow-ups'] });
+      client.invalidateQueries({ queryKey: queryKeys.dashboard });
+      client.invalidateQueries({ queryKey: ['sends'] });
       client.invalidateQueries({ queryKey: ['send-preview'] });
     },
   });

@@ -2,6 +2,7 @@ import { Ban, Send, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
+import { BulkSequenceDialog } from '@/components/BulkSequenceDialog';
 import { ListCompositionBar } from '@/components/charts/ListCompositionBar';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
 import { IndustryFilter } from '@/components/IndustrySelect';
@@ -19,11 +20,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
 import {
+  useApplyGroupAssignment,
   useContacts,
   useContactStats,
   useImportContacts,
   usePreviewImport,
   useSuppressContact,
+  useTemplateGroups,
 } from '@/hooks';
 import type { Contact, ContactFilter } from '@/lib/api';
 import { formatRelative, fullName, plural } from '@/lib/format';
@@ -40,6 +43,8 @@ const FILTERS: { value: ContactFilter; label: string }[] = [
 ];
 
 const PAGE_SIZE = 50;
+const ALL_GROUPS = 'all';
+const NO_GROUP = 'none';
 
 const IMPORT_FIELDS: { value: string; label: string }[] = [
   { value: 'ignore', label: 'Ignore' },
@@ -354,7 +359,12 @@ export function ContactsPage() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<ContactFilter>('all');
   const [industry, setIndustry] = useState('');
+  const [group, setGroup] = useState('');
   const [offset, setOffset] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [allMatching, setAllMatching] = useState(false);
+  const [assignGroupId, setAssignGroupId] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [sendTo, setSendTo] = useState<Contact | null>(null);
   const [suppressTarget, setSuppressTarget] = useState<Contact | null>(null);
 
@@ -362,14 +372,76 @@ export function ContactsPage() {
     q: query,
     status,
     industry,
+    group,
     limit: PAGE_SIZE,
     offset,
   });
-  // Scoped by the search and industry, but not by the status filter — the chips
-  // need to show what you'd get by switching to them, not what the current chip shows.
-  const { data: stats } = useContactStats({ q: query, industry });
+  // Scoped by the search, industry, and group, but not by the status filter — the
+  // chips need to show what you'd get by switching to them, not what the current chip shows.
+  const { data: stats } = useContactStats({ q: query, industry, group });
+  const { data: groupsData } = useTemplateGroups();
+  const unassign = useApplyGroupAssignment();
+  const groups = groupsData?.data ?? [];
   const contacts = data?.data ?? [];
   const total = data?.meta.total ?? 0;
+  const pageIds = contacts.map((contact) => contact.id);
+  const selectedOnPage = pageIds.filter((id) => selected.has(id)).length;
+  const pageFullySelected = pageIds.length > 0 && selectedOnPage === pageIds.length;
+  const selectedCount = allMatching ? total : selected.size;
+
+  useEffect(() => {
+    setSelected(new Set());
+    setAllMatching(false);
+  }, [query, status, industry, group]);
+
+  function clearSelection() {
+    setSelected(new Set());
+    setAllMatching(false);
+  }
+
+  function togglePage() {
+    if (allMatching || pageFullySelected) {
+      setAllMatching(false);
+      setSelected((current) => {
+        const next = new Set(current);
+        for (const id of pageIds) next.delete(id);
+        return next;
+      });
+      return;
+    }
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const id of pageIds) next.add(id);
+      return next;
+    });
+  }
+
+  function toggleContact(id: string) {
+    if (allMatching) {
+      setAllMatching(false);
+      setSelected(new Set(pageIds.filter((pageId) => pageId !== id)));
+      return;
+    }
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function unassignSelected() {
+    unassign.mutate(
+      allMatching
+        ? { groupId: null, allMatching: true, q: query, status, industry, group, acknowledge: [] }
+        : { groupId: null, contactIds: [...selected], acknowledge: [] },
+      { onSuccess: clearSelection },
+    );
+  }
+
+  const assignmentTarget = allMatching
+    ? { allMatching: true, q: query, status, industry, group }
+    : { contactIds: [...selected] };
 
   useEffect(() => {
     if (offset > 0 && offset >= total && data) {
@@ -431,6 +503,26 @@ export function ContactsPage() {
               setOffset(0);
             }}
           />
+          <Select
+            value={group || ALL_GROUPS}
+            onValueChange={(next) => {
+              setGroup(next === ALL_GROUPS ? '' : next);
+              setOffset(0);
+            }}
+          >
+            <SelectTrigger className="w-56" aria-label="Filter contacts by group">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_GROUPS}>All groups</SelectItem>
+              <SelectItem value={NO_GROUP}>No group</SelectItem>
+              {groups.map((item) => (
+                <SelectItem key={item.id} value={item.id}>
+                  {item.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Segmented
             aria-label="Filter contacts by status"
             value={status}
@@ -445,11 +537,62 @@ export function ContactsPage() {
           />
         </div>
 
+        {selectedCount > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2">
+            <span className="text-xs font-medium">
+              {allMatching
+                ? `All ${plural(total, 'contact')} matching this filter are selected`
+                : `${plural(selectedCount, 'contact')} selected`}
+            </span>
+            {pageFullySelected && !allMatching && total > contacts.length ? (
+              <button
+                type="button"
+                className="text-xs font-medium text-primary hover:underline"
+                onClick={() => setAllMatching(true)}
+              >
+                Select all {total} matching this filter
+              </button>
+            ) : null}
+            <Select value={assignGroupId} onValueChange={setAssignGroupId}>
+              <SelectTrigger className="w-56" aria-label="Group to start">
+                <SelectValue placeholder="Choose a group" />
+              </SelectTrigger>
+              <SelectContent>
+                {groups.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              disabled={!assignGroupId}
+              onClick={() => setConfirmOpen(true)}
+            >
+              <Send />
+              Start sequence
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={unassign.isPending}
+              onClick={unassignSelected}
+            >
+              {unassign.isPending ? 'Unassigning…' : 'Unassign'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={clearSelection}>
+              Clear
+            </Button>
+          </div>
+        ) : null}
+        {selectedCount > 0 ? <ErrorBanner error={unassign.error} /> : null}
+
         <ErrorBanner error={error} />
 
         <Card className="overflow-hidden">
           {isLoading ? (
-            <TableSkeleton cols={8} />
+            <TableSkeleton cols={10} />
           ) : contacts.length === 0 ? (
             <EmptyState
               title="No contacts match"
@@ -460,10 +603,24 @@ export function ContactsPage() {
               <Table>
                 <thead>
                   <tr>
+                    <Th className="w-8">
+                      <Checkbox
+                        aria-label="Select all contacts on this page"
+                        checked={
+                          allMatching || pageFullySelected
+                            ? true
+                            : selectedOnPage > 0
+                              ? 'indeterminate'
+                              : false
+                        }
+                        onCheckedChange={togglePage}
+                      />
+                    </Th>
                     <Th>Email</Th>
                     <Th>Name</Th>
                     <Th>Company</Th>
                     <Th>Industry</Th>
+                    <Th>Group</Th>
                     <Th>Title</Th>
                     <Th>Status</Th>
                     <Th>Last sent</Th>
@@ -473,6 +630,13 @@ export function ContactsPage() {
                 <tbody>
                   {contacts.map((contact) => (
                     <Tr key={contact.id}>
+                      <Td>
+                        <Checkbox
+                          aria-label={`Select ${contact.email}`}
+                          checked={allMatching || selected.has(contact.id)}
+                          onCheckedChange={() => toggleContact(contact.id)}
+                        />
+                      </Td>
                       <Td className="font-mono text-xs">
                         <Link to={`/contacts/${contact.id}`} className="hover:underline">
                           {contact.email}
@@ -492,6 +656,7 @@ export function ContactsPage() {
                         )}
                       </Td>
                       <Td className="whitespace-nowrap">{contact.companyIndustry || '—'}</Td>
+                      <Td className="whitespace-nowrap">{contact.groupName || '—'}</Td>
                       <Td>{contact.title || '—'}</Td>
                       <Td>
                         <ValidationBadge contact={contact} />
@@ -542,6 +707,14 @@ export function ContactsPage() {
           onOffsetChange={setOffset}
         />
       </PageBody>
+
+      <BulkSequenceDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        groupId={assignGroupId}
+        target={assignmentTarget}
+        onStarted={clearSelection}
+      />
 
       {sendTo ? (
         <SendModal

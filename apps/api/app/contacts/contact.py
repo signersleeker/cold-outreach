@@ -3,12 +3,24 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    and_,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.contacts.constants import VALIDATION_PENDING
 from app.database import Base
+from app.sequences.constants import ENROLLMENT_ACTIVE
+from app.sequences.enrollment import FollowUpEnrollment
 
 
 class Contact(Base):
@@ -67,6 +79,31 @@ class Contact(Base):
     )
 
     company_ref = relationship("Company", back_populates="contacts")
+    active_enrollment: Mapped[FollowUpEnrollment | None] = relationship(
+        FollowUpEnrollment,
+        primaryjoin=lambda: and_(
+            Contact.id == FollowUpEnrollment.contact_id,
+            FollowUpEnrollment.status == ENROLLMENT_ACTIVE,
+        ),
+        foreign_keys=lambda: [FollowUpEnrollment.contact_id],
+        viewonly=True,
+        uselist=False,
+        overlaps="contact",
+    )
+
+    @property
+    def group_id(self) -> uuid.UUID | None:
+        enrollment = self.active_enrollment
+        if enrollment is None:
+            return None
+        return enrollment.group_id
+
+    @property
+    def group_name(self) -> str:
+        enrollment = self.active_enrollment
+        if enrollment is None or enrollment.group is None:
+            return ""
+        return enrollment.group.name
 
     @property
     def company(self) -> str:

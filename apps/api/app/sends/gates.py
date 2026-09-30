@@ -30,9 +30,7 @@ from app.sends.constants import (
     GATE_EMAIL_INVALID,
     GATE_GMAIL_NOT_CONNECTED,
     GATE_MISSING_COMPANY,
-    GATE_MISSING_TITLE,
     GATE_MULTIPLE_LINKS,
-    GATE_NO_SOURCE_RECORDED,
     GATE_SETTINGS_INCOMPLETE,
     GATE_SUBJECT_EMPTY,
     GATE_TEMPLATE_MISSING,
@@ -73,8 +71,6 @@ class GateInput:
     is_suppressed: bool
     suppressed_reason: str
     company: str
-    title: str
-    source: str
     # --- template / rendered output ---
     template_exists: bool
     subject: str
@@ -202,8 +198,6 @@ def evaluate_gates(i: GateInput) -> GateResult:
 
     if not i.company.strip():
         warnings.append(GateFinding(GATE_MISSING_COMPANY, "No company recorded."))
-    if not i.title.strip():
-        warnings.append(GateFinding(GATE_MISSING_TITLE, "No job title recorded."))
 
     link_count = count_http_links(i.final_body)
     if link_count > 1:
@@ -212,15 +206,6 @@ def evaluate_gates(i: GateInput) -> GateResult:
                 GATE_MULTIPLE_LINKS,
                 f"Body contains {link_count} links including the unsubscribe URL. "
                 "More than one reads as marketing.",
-            )
-        )
-
-    if not i.source.strip():
-        warnings.append(
-            GateFinding(
-                GATE_NO_SOURCE_RECORDED,
-                "No source recorded for this address. That is your evidence for "
-                "why contacting this person is defensible.",
             )
         )
 

@@ -7,7 +7,7 @@ from fastapi import APIRouter, File, Form, Query, Response, UploadFile
 
 from app.companies.constants import resolve_industry_filter
 from app.constants import MAX_CSV_BYTES
-from app.contacts import service
+from app.contacts import assignments, service
 from app.contacts.constants import CONTACT_FILTERS
 from app.contacts.csv_import import CsvFormatError, parse_mapping_json, preview_csv
 from app.contacts.schemas import (
@@ -15,11 +15,13 @@ from app.contacts.schemas import (
     ContactDTO,
     ContactPatchRequest,
     ContactStatsDTO,
+    GroupAssignmentPreviewRequest,
+    GroupAssignmentRequest,
     ImportPreviewDTO,
     ImportSummaryDTO,
     SuppressContactRequest,
 )
-from app.deps import ClockDep, DbSession, ValidatorDep
+from app.deps import ClockDep, DbSession, SendServiceDep, ValidatorDep
 from app.lib.errors import AppError
 from app.lib.response import data_body, list_body
 from app.suppressions import service as suppressions_service
@@ -35,6 +37,7 @@ def list_contacts(
     status: str = Query(default="all"),
     company_id: uuid.UUID | None = Query(default=None, alias="companyId"),
     industry: str = Query(default=""),
+    group: str = Query(default=""),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> Response:
@@ -46,6 +49,7 @@ def list_contacts(
         status=status,
         company_id=company_id,
         industry=resolve_industry_filter(industry),
+        group=service.resolve_group_filter(db, group),
         limit=limit,
         offset=offset,
     )
@@ -63,6 +67,7 @@ def contact_stats(
     q: str = Query(default=""),
     company_id: uuid.UUID | None = Query(default=None, alias="companyId"),
     industry: str = Query(default=""),
+    group: str = Query(default=""),
 ) -> Response:
     return data_body(
         ContactStatsDTO(
@@ -71,9 +76,46 @@ def contact_stats(
                 q=q,
                 company_id=company_id,
                 industry=resolve_industry_filter(industry),
+                group=service.resolve_group_filter(db, group),
             )
         )
     )
+
+
+def _assignment_kwargs(payload: GroupAssignmentRequest | GroupAssignmentPreviewRequest) -> dict:
+    return {
+        "contact_ids": payload.contact_ids,
+        "all_matching": payload.all_matching,
+        "q": payload.q,
+        "status": payload.status,
+        "industry": payload.industry,
+        "group": payload.group,
+        "acknowledge": frozenset(payload.acknowledge),
+    }
+
+
+@router.post("/contacts/group-assignments/preview")
+def preview_group_assignment(
+    payload: GroupAssignmentPreviewRequest, db: DbSession, sends: SendServiceDep
+) -> Response:
+    result = assignments.preview(
+        db, sends, group_id=payload.group_id, **_assignment_kwargs(payload)
+    )
+    return data_body(result)
+
+
+@router.post("/contacts/group-assignments")
+def apply_group_assignment(
+    payload: GroupAssignmentRequest, db: DbSession, sends: SendServiceDep, clock: ClockDep
+) -> Response:
+    result = assignments.apply(
+        db,
+        sends,
+        clock=clock,
+        group_id=payload.group_id,
+        **_assignment_kwargs(payload),
+    )
+    return data_body(result)
 
 
 @router.post("/contacts")

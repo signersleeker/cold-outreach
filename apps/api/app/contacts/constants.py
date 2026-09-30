@@ -117,3 +117,6 @@ CONSUMER_DOMAINS = frozenset(
 )
 
 CONTACT_FILTERS = frozenset({"all", "ready", "risky", "invalid", "pending", "sent", "suppressed"})
+
+# Query value for contacts with no active template-group plan.
+UNASSIGNED_GROUP = "none"

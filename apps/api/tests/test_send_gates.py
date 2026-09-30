@@ -16,9 +16,7 @@ from app.sends.constants import (
     GATE_EMAIL_INVALID,
     GATE_GMAIL_NOT_CONNECTED,
     GATE_MISSING_COMPANY,
-    GATE_MISSING_TITLE,
     GATE_MULTIPLE_LINKS,
-    GATE_NO_SOURCE_RECORDED,
     GATE_SETTINGS_INCOMPLETE,
     GATE_SUBJECT_EMPTY,
     GATE_TEMPLATE_MISSING,
@@ -45,8 +43,6 @@ def gate_input(**overrides) -> GateInput:
         "is_suppressed": False,
         "suppressed_reason": "",
         "company": "Northwind Mutual",
-        "title": "CISO",
-        "source": "https://example.com/leadership",
         "template_exists": True,
         "subject": "shadow AI + pre-execution control",
         "final_body": GOOD_BODY,
@@ -211,14 +207,8 @@ def test_work_domain_does_not_warn() -> None:
     assert GATE_CONSUMER_DOMAIN not in codes(result.warnings)
 
 
-def test_missing_company_and_title_warn_independently() -> None:
+def test_missing_company_warns() -> None:
     assert GATE_MISSING_COMPANY in codes(evaluate_gates(gate_input(company="")).warnings)
-    assert GATE_MISSING_TITLE in codes(evaluate_gates(gate_input(title="")).warnings)
-
-
-def test_missing_source_warns_because_it_is_the_evidence_trail() -> None:
-    result = evaluate_gates(gate_input(source=""))
-    assert GATE_NO_SOURCE_RECORDED in codes(result.warnings)
 
 
 def test_a_second_link_warns() -> None:

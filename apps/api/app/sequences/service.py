@@ -108,6 +108,7 @@ def enroll(
     contact_id: uuid.UUID,
     group_id: uuid.UUID,
     clock: Clock,
+    commit: bool = True,
 ) -> FollowUpEnrollment:
     contact = db.get(Contact, contact_id)
     if contact is None:
@@ -144,6 +145,12 @@ def enroll(
                 due_on=today if item.position == 0 else None,
             )
         )
+
+    db.flush()
+    if not commit:
+        loaded = _load_enrollment(db, enrollment.id)
+        assert loaded is not None
+        return loaded
 
     db.commit()
     loaded = _load_enrollment(db, enrollment.id)

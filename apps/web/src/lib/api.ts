@@ -84,6 +84,8 @@ export interface Contact {
   suppressedAt: string | null;
   lastSentAt: string | null;
   createdAt: string;
+  groupId: string | null;
+  groupName: string;
 }
 
 /** The editable fields when adding a contact by hand. */
@@ -205,6 +207,43 @@ export interface GateFinding {
   code: string;
   message: string;
   requiresAck: boolean;
+}
+
+export interface GroupAssignmentTarget {
+  contactIds?: string[];
+  allMatching?: boolean;
+  q?: string;
+  status?: ContactFilter;
+  industry?: string;
+  group?: string;
+}
+
+export interface AssignmentContact {
+  contactId: string;
+  email: string;
+  name: string;
+  blockers: GateFinding[];
+  warnings: GateFinding[];
+}
+
+export interface GroupAssignmentPreview {
+  groupId: string;
+  groupName: string;
+  templateId: string;
+  templateName: string;
+  willSend: number;
+  sendsToday: number;
+  dailyCap: number;
+  sendable: AssignmentContact[];
+  blocked: AssignmentContact[];
+  warnings: AssignmentContact[];
+}
+
+export interface GroupAssignmentResult {
+  sent: number;
+  unassigned: number;
+  skipped: AssignmentContact[];
+  failed: AssignmentContact[];
 }
 
 export interface SendPreview {
@@ -413,6 +452,7 @@ export const api = {
     status?: ContactFilter;
     companyId?: string;
     industry?: string;
+    group?: string;
     limit?: number;
     offset?: number;
   }) => {
@@ -421,17 +461,21 @@ export const api = {
     if (params.status && params.status !== 'all') query.set('status', params.status);
     if (params.companyId) query.set('companyId', params.companyId);
     if (params.industry) query.set('industry', params.industry);
+    if (params.group) query.set('group', params.group);
     query.set('limit', String(params.limit ?? 50));
     query.set('offset', String(params.offset ?? 0));
     return unwrapList<Contact[], { total: number; limit: number; offset: number }>(
       `/api/v1/contacts?${query}`,
     );
   },
-  contactStats: (params: { q?: string; companyId?: string; industry?: string } = {}) => {
+  contactStats: (
+    params: { q?: string; companyId?: string; industry?: string; group?: string } = {},
+  ) => {
     const query = new URLSearchParams();
     if (params.q) query.set('q', params.q);
     if (params.companyId) query.set('companyId', params.companyId);
     if (params.industry) query.set('industry', params.industry);
+    if (params.group) query.set('group', params.group);
     return unwrap<ContactStats>(`/api/v1/contacts/stats?${query}`);
   },
   contact: (id: string) => unwrap<Contact>(`/api/v1/contacts/${id}`),
@@ -550,6 +594,20 @@ export const api = {
       `/api/v1/contacts/${contactId}/follow-up`,
       { method: 'DELETE' },
     ),
+  previewGroupAssignment: (
+    input: GroupAssignmentTarget & { groupId: string; acknowledge: string[] },
+  ) =>
+    unwrap<GroupAssignmentPreview>('/api/v1/contacts/group-assignments/preview', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  applyGroupAssignment: (
+    input: GroupAssignmentTarget & { groupId: string | null; acknowledge: string[] },
+  ) =>
+    unwrap<GroupAssignmentResult>('/api/v1/contacts/group-assignments', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
 
   // sends
   previewSend: (input: { contactId: string; templateId: string; acknowledge: string[] }) =>

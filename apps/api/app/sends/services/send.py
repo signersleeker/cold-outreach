@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -48,6 +48,7 @@ from app.sends.gates import GateResult, evaluate_gates
 from app.sends.models.send_event import SendEvent
 from app.sends.services import counters
 from app.sends.services.gate_input import collect
+
 
 @dataclass(frozen=True)
 class SendPreview:
@@ -90,6 +91,7 @@ class SendService:
         contact_id: uuid.UUID,
         template_id: uuid.UUID,
         acknowledge: frozenset[str] = frozenset(),
+        assumed_sends_today: int | None = None,
     ) -> SendPreview:
         contact = db.get(Contact, contact_id)
         if contact is None:
@@ -112,6 +114,9 @@ class SendService:
             acknowledge=acknowledge,
             client=gmail_client,
         )
+        gate_input = collected.gate_input
+        if assumed_sends_today is not None:
+            gate_input = replace(gate_input, sends_today=assumed_sends_today)
         return SendPreview(
             subject=collected.subject,
             body=collected.final_body,
@@ -119,9 +124,9 @@ class SendService:
             signature_html=collected.signature_html,
             unsub_url=collected.unsub_url,
             from_email=collected.from_email,
-            sends_today=collected.gate_input.sends_today,
-            daily_cap=collected.gate_input.daily_cap,
-            result=evaluate_gates(collected.gate_input),
+            sends_today=gate_input.sends_today,
+            daily_cap=gate_input.daily_cap,
+            result=evaluate_gates(gate_input),
         )
 
     # ---------------------------------------------------------------- send ----

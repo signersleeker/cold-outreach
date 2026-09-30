@@ -226,8 +226,7 @@ did.
 **Warnings — the send proceeds, but look first**
 
 `validation_risky`, `validation_pending`, `validation_unknown` (these three require
-acknowledgement), `consumer_domain`, `missing_company`, `missing_title`, `multiple_links`,
-`no_source_recorded`.
+acknowledgement), `consumer_domain`, `missing_company`, `multiple_links`.
 
 ### What gets appended
 

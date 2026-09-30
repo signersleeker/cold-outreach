@@ -1,10 +1,11 @@
-import type { ContactFilter, NoteTarget } from './api';
+import type { ContactFilter, GroupAssignmentTarget, NoteTarget } from './api';
 
 export interface ContactsQuery {
   q?: string;
   status?: ContactFilter;
   companyId?: string;
   industry?: string;
+  group?: string;
   limit?: number;
   offset?: number;
 }
@@ -21,8 +22,11 @@ export const queryKeys = {
   sendActivity: (days: number) => ['dashboard', 'activity', days] as const,
   contacts: (params: ContactsQuery) => ['contacts', params] as const,
   // Under the 'contacts' prefix so the existing invalidations already cover it.
-  contactStats: (params: Pick<ContactsQuery, 'q' | 'companyId' | 'industry'>) =>
+  contactStats: (params: Pick<ContactsQuery, 'q' | 'companyId' | 'industry' | 'group'>) =>
     ['contacts', 'stats', params] as const,
+  groupAssignmentPreview: (
+    input: GroupAssignmentTarget & { groupId: string; acknowledge: string[] },
+  ) => ['group-assignment-preview', input] as const,
   contact: (id: string) => ['contacts', id] as const,
   companies: (params: CompaniesQuery) => ['companies', params] as const,
   company: (id: string) => ['companies', id] as const,

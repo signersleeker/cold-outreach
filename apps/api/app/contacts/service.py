@@ -18,6 +18,7 @@ from app.constants import (
     MAX_CSV_ROWS,
 )
 from app.contacts.constants import (
+    UNASSIGNED_GROUP,
     VALIDATION_INVALID,
     VALIDATION_PENDING,
     VALIDATION_RISKY,
@@ -31,14 +32,21 @@ from app.lib.errors import AppError
 from app.notes import service as notes_service
 from app.notes.constants import NOTABLE_COMPANY, NOTABLE_CONTACT
 from app.sends.models.send_event import SendEvent
+from app.sequences.constants import ENROLLMENT_ACTIVE
+from app.sequences.enrollment import FollowUpEnrollment
 from app.suppressions import service as suppressions_service
 from app.suppressions.constants import REASON_MANUAL
 from app.suppressions.suppression import Suppression
+from app.templates import groups as template_groups
 from app.validation.base import EmailValidator, ValidationResult
 from app.validation.email_validation import EmailValidation
 from app.validation.email_validation import by_emails as validations_by_email
 from app.validation.email_validation import get as validation_for_email
 from app.validation.email_validation import upsert as upsert_validation
+
+# A resolved list/stats scope: None is off, UNASSIGNED_GROUP is no active plan,
+# and a UUID is that group's active plan.
+GroupScope = uuid.UUID | str | None
 
 _UNSUB_TOKEN_BYTES = 32
 
@@ -89,11 +97,16 @@ class ImportSummary:
 
 
 # ------------------------------------------------------------------ queries ----
+def _contact_options():  # noqa: ANN202
+    return (
+        joinedload(Contact.company_ref),
+        joinedload(Contact.active_enrollment).joinedload(FollowUpEnrollment.group),
+    )
+
+
 def get(db: Session, contact_id: uuid.UUID) -> Contact | None:
     return db.scalar(
-        select(Contact)
-        .options(joinedload(Contact.company_ref))
-        .where(Contact.id == contact_id)
+        select(Contact).options(*_contact_options()).where(Contact.id == contact_id)
     )
 
 
@@ -142,20 +155,58 @@ def _apply_filter(query, status: str):  # noqa: ANN001 - SQLAlchemy Select gener
     return query
 
 
+def resolve_group_filter(db: Session, value: str) -> GroupScope:
+    """Group scope for a contact list.
+
+    None means the filter is off. UNASSIGNED_GROUP means no active plan. A
+    UUID must be an existing template group.
+    """
+    stripped = value.strip()
+    if not stripped:
+        return None
+    if stripped == UNASSIGNED_GROUP:
+        return UNASSIGNED_GROUP
+    try:
+        group_id = uuid.UUID(stripped)
+    except ValueError:
+        raise AppError(400, "unknown group filter") from None
+    if template_groups.get(db, group_id) is None:
+        raise AppError(400, "unknown group filter")
+    return group_id
+
+
+def _active_contact_ids(group_id: uuid.UUID | None = None):  # noqa: ANN202
+    stmt = select(FollowUpEnrollment.contact_id).where(
+        FollowUpEnrollment.status == ENROLLMENT_ACTIVE
+    )
+    if group_id is not None:
+        stmt = stmt.where(FollowUpEnrollment.group_id == group_id)
+    return stmt
+
+
 def _apply_scope(  # noqa: ANN001, ANN202
     query,
     *,
     q: str,
     company_id: uuid.UUID | None,
     industry: str | None = None,
+    group: GroupScope = None,
 ):
-    """Company, search, and industry narrowing that applies before the status filter.
+    """Company, search, industry, and group narrowing that applies before the status filter.
 
     `industry` is None when that filter is off, '' for contacts with no industry
     (no company, or a company whose industry is blank), or a canonical name.
+
+    `group` is None when that filter is off, UNASSIGNED_GROUP for contacts with
+    no active plan, or a template group id.
     """
     if company_id is not None:
         query = query.where(Contact.company_id == company_id)
+
+    if group == UNASSIGNED_GROUP:
+        query = query.where(~Contact.id.in_(_active_contact_ids()))
+    elif isinstance(group, uuid.UUID):
+        query = query.where(Contact.id.in_(_active_contact_ids(group)))
 
     if industry is not None:
         if industry == "":
@@ -192,6 +243,7 @@ def stats(
     q: str = "",
     company_id: uuid.UUID | None = None,
     industry: str | None = None,
+    group: GroupScope = None,
 ) -> dict[str, int]:
     """Row counts per status filter, under the same scope the list is using.
 
@@ -206,6 +258,7 @@ def stats(
         q=q,
         company_id=company_id,
         industry=industry,
+        group=group,
     )
 
     counts = {
@@ -228,6 +281,27 @@ def stats(
     return counts
 
 
+def matching_ids(
+    db: Session,
+    *,
+    q: str = "",
+    status: str = "all",
+    company_id: uuid.UUID | None = None,
+    industry: str | None = None,
+    group: GroupScope = None,
+) -> list[uuid.UUID]:
+    """Every contact id under the list scope, in the same order as the list."""
+    query = _apply_scope(
+        select(Contact.id),
+        q=q,
+        company_id=company_id,
+        industry=industry,
+        group=group,
+    )
+    query = _apply_filter(query, status)
+    return list(db.scalars(query.order_by(Contact.created_at.desc())))
+
+
 def search(
     db: Session,
     *,
@@ -235,20 +309,23 @@ def search(
     status: str = "all",
     company_id: uuid.UUID | None = None,
     industry: str | None = None,
+    group: GroupScope = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Contact], int]:
     query = _apply_scope(
-        select(Contact).options(joinedload(Contact.company_ref)),
+        select(Contact).options(*_contact_options()),
         q=q,
         company_id=company_id,
         industry=industry,
+        group=group,
     )
     count_query = _apply_scope(
         select(func.count()).select_from(Contact),
         q=q,
         company_id=company_id,
         industry=industry,
+        group=group,
     )
 
     query = _apply_filter(query, status)

@@ -136,8 +136,6 @@ def collect(
         is_suppressed=suppression is not None,
         suppressed_reason=suppression.reason if suppression else "",
         company=contact.company,
-        title=contact.title,
-        source=contact.source,
         template_exists=template is not None,
         subject=rendered_subject,
         final_body=gate_body,
