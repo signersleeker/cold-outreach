@@ -328,8 +328,9 @@ export function SendModal({
                   ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  The body is plain text. The Gmail HTML signature, opt-out sentence, and
-                  unsubscribe line are included above.
+                  The copy above is plain text. A linked word is written out with its address
+                  here, and is clickable in Gmail. The HTML signature, opt-out sentence, and
+                  unsubscribe line are included.
                 </p>
               </div>
             </>

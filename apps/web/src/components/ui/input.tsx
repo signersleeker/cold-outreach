@@ -17,7 +17,7 @@ export function Textarea({ className, ...props }: React.ComponentProps<'textarea
   return (
     <textarea
       className={cn(
-        'flex w-full rounded-[var(--radius-md)] border border-input bg-card px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50',
+        'flex w-full rounded-[var(--radius-md)] border border-input bg-card px-2.5 py-2 text-sm text-foreground caret-foreground outline-none transition-colors placeholder:text-muted-foreground scheme-light focus:outline-2 focus:outline-solid focus:outline-offset-2 focus:outline-ring disabled:opacity-50 dark:scheme-dark',
         className,
       )}
       {...props}

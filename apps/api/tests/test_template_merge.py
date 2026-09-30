@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.gmail.mime import build_message_parts, html_to_plain
+from app.gmail.mime import build_message_parts, html_to_plain, plain_to_html
 from app.lib.text import count_http_links
 from app.sends.services.compose import (
     append_unsub_line,
@@ -267,3 +267,43 @@ def test_message_parts_include_signature_without_counting_its_links_in_gate_body
 )
 def test_count_http_links(text: str, expected: int) -> None:
     assert count_http_links(text) == expected
+
+
+def test_pasted_link_is_clickable_in_html_and_visible_in_plain() -> None:
+    body = "Book a [time](https://cal.example/a) now.\n<script>"
+    plain, html_body = build_message_parts(
+        rendered_body=body, signature_html="", unsub_url=""
+    )
+    assert "Book a time (https://cal.example/a) now." in plain
+    assert "[time]" not in plain
+    assert '<a href="https://cal.example/a">time</a>' in html_body
+    assert "<script>" not in html_body
+    assert "&lt;script&gt;" in html_body
+
+
+def test_markdown_link_cannot_break_out_of_the_href() -> None:
+    body = '[x](https://evil.example/a"><img)'
+    _, html_body = build_message_parts(rendered_body=body, signature_html="", unsub_url="")
+    assert "<a " not in html_body
+    assert "<img" not in html_body
+    assert "&lt;img" in html_body
+
+
+def test_javascript_url_is_not_a_link() -> None:
+    body = "[x](javascript:alert(1))"
+    _, html_body = build_message_parts(rendered_body=body, signature_html="", unsub_url="")
+    assert "<a " not in html_body
+
+
+def test_several_pasted_links_keep_their_words() -> None:
+    body = "See [one](https://a.example) and [two](https://b.example/x?q=1&r=2)."
+    plain, html_body = build_message_parts(
+        rendered_body=body, signature_html="", unsub_url=""
+    )
+    assert "See one (https://a.example) and two (https://b.example/x?q=1&r=2)." in plain
+    assert '<a href="https://a.example">one</a>' in html_body
+    assert '<a href="https://b.example/x?q=1&amp;r=2">two</a>' in html_body
+
+
+def test_plain_to_html_still_escapes_a_body_without_links() -> None:
+    assert plain_to_html("a < b\nc") == "a &lt; b<br>\nc"

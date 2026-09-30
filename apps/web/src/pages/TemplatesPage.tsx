@@ -12,6 +12,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTemplateMutations, useTemplates } from '@/hooks';
 import type { Template } from '@/lib/api';
+import { htmlClipboardToPlain, plainLinks } from '@/lib/html-paste';
 import { cn } from '@/lib/utils';
 
 const MERGE_VARS = [
@@ -26,6 +27,29 @@ const MERGE_VARS = [
 ];
 
 const BLANK = { name: '', subject: '', body: '', industry: '' };
+
+function LinkedWords({ text }: { text: string }) {
+  const links = plainLinks(text);
+  if (links.length === 0) return null;
+  return (
+    <p className="text-xs text-muted-foreground">
+      Clickable in the email:{' '}
+      {links.map((link, index) => (
+        <span key={`${link.href}-${index}`}>
+          {index > 0 ? ', ' : null}
+          <a
+            href={link.href}
+            target="_blank"
+            rel="noreferrer"
+            className="text-link underline underline-offset-4"
+          >
+            {link.label}
+          </a>
+        </span>
+      ))}
+    </p>
+  );
+}
 
 export function TemplatesPage() {
   const { data, isLoading } = useTemplates();
@@ -74,7 +98,7 @@ export function TemplatesPage() {
         title="Templates"
         description={
           section === 'templates'
-            ? 'Plain text only. Tag a template with an industry when it is written for that kind of company.'
+            ? 'Paste from Gmail and a linked word keeps its address. Tag a template with an industry when it is written for that kind of company.'
             : 'A group is an ordered list of templates. Sending still happens one template at a time.'
         }
         actions={
@@ -203,14 +227,33 @@ export function TemplatesPage() {
                   onChange={(event) => setDraft((d) => ({ ...d, subject: event.target.value }))}
                 />
               </Field>
-              <Field label="Body">
+              <Field
+                label="Body"
+                hint="A linked word pastes as [text](https://…). That word is the link in Gmail; the address is written out in the plain-text copy."
+              >
                 <Textarea
                   rows={16}
-                  className="font-mono text-xs"
+                  className="font-mono text-sm leading-5"
                   value={draft.body}
                   onChange={(event) => setDraft((d) => ({ ...d, body: event.target.value }))}
+                  onPaste={(event) => {
+                    const converted = htmlClipboardToPlain(event.clipboardData.getData('text/html'));
+                    if (!converted) return;
+                    event.preventDefault();
+                    const el = event.currentTarget;
+                    const start = el.selectionStart;
+                    const end = el.selectionEnd;
+                    const next = draft.body.slice(0, start) + converted + draft.body.slice(end);
+                    setDraft((d) => ({ ...d, body: next }));
+                    const cursor = start + converted.length;
+                    requestAnimationFrame(() => {
+                      el.focus();
+                      el.setSelectionRange(cursor, cursor);
+                    });
+                  }}
                 />
               </Field>
+              <LinkedWords text={draft.body} />
 
               <Callout tone="neutral" title="Merge fields">
                 <p className="font-mono text-muted-foreground">
