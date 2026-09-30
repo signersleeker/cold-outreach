@@ -15,6 +15,10 @@ def _website(value: str) -> str:
     return value.strip()[:500]
 
 
+def _location(value: str) -> str:
+    return value.strip()[:200]
+
+
 def get(db: Session, company_id: uuid.UUID) -> Company | None:
     return db.get(Company, company_id)
 
@@ -33,8 +37,10 @@ def find_by_name(db: Session, name: str) -> Company | None:
     return db.scalar(select(Company).where(func.lower(Company.name) == stripped.lower()))
 
 
-def fill_blanks(company: Company, *, website: str = "", industry: str = "") -> None:
-    """Set website or industry only where the company does not already have one.
+def fill_blanks(
+    company: Company, *, website: str = "", industry: str = "", location: str = ""
+) -> None:
+    """Set website, industry, or location only where the company does not already have one.
 
     An unrecognised industry is ignored so a bad CSV cell does not fail the row.
     """
@@ -45,6 +51,9 @@ def fill_blanks(company: Company, *, website: str = "", industry: str = "") -> N
         matched = match_industry(industry)
         if matched:
             company.industry = matched
+    place = _location(location)
+    if place and not company.location:
+        company.location = place
 
 
 def find_or_create(db: Session, name: str) -> Company | None:
@@ -71,6 +80,7 @@ def create(
     *,
     website: str = "",
     industry: str = "",
+    location: str = "",
 ) -> Company:
     """Create a company explicitly. Refuses a blank or duplicate name."""
     stripped = name.strip()
@@ -83,6 +93,7 @@ def create(
         name=stripped[:200],
         website=_website(website),
         industry=require_industry(industry),
+        location=_location(location),
     )
     db.add(company)
     db.commit()
@@ -97,6 +108,7 @@ def update(
     name: str | None = None,
     website: str | None = None,
     industry: str | None = None,
+    location: str | None = None,
 ) -> Company:
     company = require(db, company_id)
     if name is not None:
@@ -111,6 +123,8 @@ def update(
         company.website = _website(website)
     if industry is not None:
         company.industry = require_industry(industry)
+    if location is not None:
+        company.location = _location(location)
     db.add(company)
     db.commit()
     db.refresh(company)

@@ -21,7 +21,7 @@ _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 # split into first/last only when no dedicated columns are present.
 TEXT_FIELDS = ("first_name", "last_name", "company", "title", "hook", "notes", "source")
 # Stored on the company row, not the contact.
-COMPANY_FIELDS = ("website", "industry")
+COMPANY_FIELDS = ("website", "industry", "location")
 IMPORTABLE_FIELDS = frozenset({"email", "full_name", *TEXT_FIELDS, *COMPANY_FIELDS})
 
 
@@ -86,6 +86,7 @@ class ParsedRow:
     source: str = ""
     website: str = ""
     industry: str = ""
+    location: str = ""
 
 
 @dataclass

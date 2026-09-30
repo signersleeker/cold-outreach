@@ -60,6 +60,10 @@ HEADER_ALIASES: dict[str, str] = {
     "industry": "industry",
     "sector": "industry",
     "vertical": "industry",
+    "company_location": "location",
+    "location": "location",
+    "city": "location",
+    "company_city": "location",
     # title
     "title": "title",
     "job_title": "title",

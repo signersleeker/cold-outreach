@@ -150,6 +150,7 @@ override any suggestion before importing:
 | `first_name` | first_name, First Name, First, Given Name, fname                       |
 | `last_name`  | last_name, Last Name, Last, Surname, Family Name, lname                |
 | `company`    | company, Company Name, Organisation, Organization, Account, Employer   |
+| `location`   | company_location, Company Location, location, city                     |
 | `title`      | title, Job Title, Position, Role                                       |
 | `hook`       | hook, angle                                                            |
 | `notes`      | notes, note, comments                                                  |

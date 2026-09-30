@@ -74,7 +74,7 @@ export function CompanyDetailPage() {
   const [offset, setOffset] = useState(0);
   const [sendTo, setSendTo] = useState<Contact | null>(null);
   const [suppressTarget, setSuppressTarget] = useState<Contact | null>(null);
-  const [profile, setProfile] = useState({ name: '', website: '', industry: '' });
+  const [profile, setProfile] = useState({ name: '', website: '', industry: '', location: '' });
   const updateCompany = useUpdateCompany();
 
   const companyQuery = useCompany(id);
@@ -93,6 +93,7 @@ export function CompanyDetailPage() {
       name: company.name,
       website: company.website,
       industry: company.industry,
+      location: company.location,
     });
   }, [company]);
   const total = contactsQuery.data?.meta.total ?? 0;
@@ -116,7 +117,7 @@ export function CompanyDetailPage() {
         title={company?.name ?? 'Company'}
         description={
           company
-            ? [company.industry, `${total} contact${total === 1 ? '' : 's'}`]
+            ? [company.industry, company.location, `${total} contact${total === 1 ? '' : 's'}`]
                 .filter(Boolean)
                 .join(' · ')
             : 'Loading company…'
@@ -145,7 +146,8 @@ export function CompanyDetailPage() {
                 !profile.name.trim() ||
                 (profile.name === company.name &&
                   profile.website === company.website &&
-                  profile.industry === company.industry)
+                  profile.industry === company.industry &&
+                  profile.location === company.location)
               }
               onClick={() =>
                 updateCompany.mutate({
@@ -153,6 +155,7 @@ export function CompanyDetailPage() {
                   name: profile.name.trim(),
                   website: profile.website.trim(),
                   industry: profile.industry,
+                  location: profile.location.trim(),
                 })
               }
             >
@@ -171,6 +174,16 @@ export function CompanyDetailPage() {
               <IndustrySelect
                 value={profile.industry}
                 onValueChange={(industry) => setProfile((current) => ({ ...current, industry }))}
+              />
+            </Field>
+            <Field label="Location" className="sm:col-span-2">
+              <Input
+                maxLength={200}
+                placeholder="Sydney, Australia"
+                value={profile.location}
+                onChange={(event) =>
+                  setProfile((current) => ({ ...current, location: event.target.value }))
+                }
               />
             </Field>
             <Field label="Website" className="sm:col-span-2">

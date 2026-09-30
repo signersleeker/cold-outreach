@@ -46,6 +46,7 @@ const IMPORT_FIELDS: { value: string; label: string }[] = [
   { value: 'company', label: 'Company name' },
   { value: 'website', label: 'Company website' },
   { value: 'industry', label: 'Industry' },
+  { value: 'location', label: 'Company location' },
   { value: 'first_name', label: 'First name' },
   { value: 'last_name', label: 'Last name' },
   { value: 'full_name', label: 'Full name' },
@@ -127,8 +128,8 @@ function ImportDialog() {
               ? 'Addresses we have not checked before are imported unvalidated. A previous result is reused.'
               : 'Addresses we have not checked before are validated on import. A previous result is reused, and invalid ones are suppressed automatically.'}{' '}
             Record where each address came from in the <strong>source</strong> column — that is
-            your evidence for why contacting this person is defensible. Website and industry are
-            stored on the company; the first non-blank value is kept.
+            your evidence for why contacting this person is defensible. Website, industry, and
+            location are stored on the company; the first non-blank value is kept.
           </p>
           <label className="flex cursor-pointer items-start gap-2.5 text-xs">
             <Checkbox

@@ -54,7 +54,7 @@ export function CompaniesPage() {
 
       <Card className="overflow-hidden">
         {isLoading ? (
-          <TableSkeleton cols={5} />
+          <TableSkeleton cols={6} />
         ) : companies.length === 0 ? (
           <EmptyState
             icon={Building2}
@@ -69,6 +69,7 @@ export function CompaniesPage() {
                 <tr>
                   <Th>Name</Th>
                   <Th>Industry</Th>
+                  <Th>Location</Th>
                   <Th>Website</Th>
                   <Th>Contacts</Th>
                   <Th>Created</Th>
@@ -86,6 +87,7 @@ export function CompaniesPage() {
                       </Link>
                     </Td>
                     <Td>{company.industry || '—'}</Td>
+                    <Td>{company.location || '—'}</Td>
                     <Td className="max-w-48 truncate text-xs">
                       {company.website ? (
                         <a

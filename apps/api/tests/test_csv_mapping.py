@@ -133,6 +133,18 @@ def test_website_and_industry_columns_are_mapped() -> None:
     }
 
 
+def test_company_location_header_maps_to_location() -> None:
+    result = parse(
+        "Email,Company,company_location\n"
+        "a@example.com,Northwind,Sydney\n"
+    )
+    assert result.rows[0].location == "Sydney"
+    assert build_column_map(["Email", "Company Location", "City"]) == {
+        "email": 0,
+        "location": 1,
+    }
+
+
 def test_preview_suggests_aliases() -> None:
     preview = preview_csv(b"Work Email,Company Name,Lead Score\n")
     assert preview.headers == ["Work Email", "Company Name", "Lead Score"]

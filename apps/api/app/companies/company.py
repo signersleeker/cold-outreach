@@ -22,6 +22,7 @@ class Company(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     website: Mapped[str] = mapped_column(String(500), nullable=False, server_default="", default="")
     industry: Mapped[str] = mapped_column(String(80), nullable=False, server_default="", default="")
+    location: Mapped[str] = mapped_column(String(200), nullable=False, server_default="", default="")
 
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

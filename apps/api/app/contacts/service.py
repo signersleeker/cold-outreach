@@ -485,7 +485,10 @@ def import_csv(
         _assign_company(db, contact, row.company)
         if contact.company_ref is not None:
             companies_service.fill_blanks(
-                contact.company_ref, website=row.website, industry=row.industry
+                contact.company_ref,
+                website=row.website,
+                industry=row.industry,
+                location=row.location,
             )
         _assign_unsub_token(db, contact)
         db.add(contact)

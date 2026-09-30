@@ -13,6 +13,7 @@ class CompanyDTO(CamelModel):
     name: str
     website: str = ""
     industry: str = ""
+    location: str = ""
     contact_count: int = 0
     created_at: dt.datetime
 
@@ -22,6 +23,7 @@ class CompanyDetailDTO(CamelModel):
     name: str
     website: str = ""
     industry: str = ""
+    location: str = ""
     created_at: dt.datetime
     updated_at: dt.datetime
 
@@ -30,9 +32,11 @@ class CompanyCreateRequest(CamelModel):
     name: str = Field(min_length=1, max_length=200)
     website: str = Field(default="", max_length=500)
     industry: str = Field(default="", max_length=80)
+    location: str = Field(default="", max_length=200)
 
 
 class CompanyPatchRequest(CamelModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     website: str | None = Field(default=None, max_length=500)
     industry: str | None = Field(default=None, max_length=80)
+    location: str | None = Field(default=None, max_length=200)

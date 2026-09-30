@@ -107,26 +107,34 @@ def test_create_and_update_website_and_industry(db: Session) -> None:
     from app.lib.errors import AppError
 
     company = companies_service.create(
-        db, "Northwind", website=" https://northwind.example ", industry="insurance"
+        db,
+        "Northwind",
+        website=" https://northwind.example ",
+        industry="insurance",
+        location="  Sydney  ",
     )
     assert company.website == "https://northwind.example"
     assert company.industry == "Insurance"
+    assert company.location == "Sydney"
 
-    updated = companies_service.update(db, company.id, industry="Mining & Metals", website="")
+    updated = companies_service.update(
+        db, company.id, industry="Mining & Metals", website="", location="Melbourne"
+    )
     assert updated.industry == "Mining & Metals"
     assert updated.website == ""
+    assert updated.location == "Melbourne"
 
     with pytest.raises(AppError) as unknown:
         companies_service.create(db, "Acme", industry="Space Mining")
     assert unknown.value.status_code == 400
 
 
-def test_import_sets_website_and_industry(db: Session, validator, clock) -> None:
+def test_import_sets_website_industry_and_location(db: Session, validator, clock) -> None:
     csv = (
-        "Email,Company,Website,Industry\n"
-        "a@northwind.example,Northwind,,\n"
-        "b@northwind.example,Northwind, https://northwind.example ,insurance\n"
-        "c@acme.example,Acme,acme.example,Not A Real Industry\n"
+        "Email,Company,Website,Industry,company_location\n"
+        "a@northwind.example,Northwind,,,\n"
+        "b@northwind.example,Northwind, https://northwind.example ,insurance, Sydney \n"
+        "c@acme.example,Acme,acme.example,Not A Real Industry,\n"
     )
     summary = contacts_service.import_csv(db, csv.encode(), validator=validator, clock=clock)
     assert summary.created == 3
@@ -136,8 +144,10 @@ def test_import_sets_website_and_industry(db: Session, validator, clock) -> None
     assert northwind is not None and acme is not None
     assert northwind.website == "https://northwind.example"
     assert northwind.industry == "Insurance"
+    assert northwind.location == "Sydney"
     assert acme.website == "acme.example"
     assert acme.industry == ""
+    assert acme.location == ""
 
     contact = contacts_service.by_email(db, "a@northwind.example")
     assert contact is not None

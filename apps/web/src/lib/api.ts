@@ -279,6 +279,7 @@ export interface Company {
   name: string;
   website: string;
   industry: string;
+  location: string;
   contactCount: number;
   createdAt: string;
 }
@@ -288,6 +289,7 @@ export interface CompanyDetail {
   name: string;
   website: string;
   industry: string;
+  location: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -296,6 +298,7 @@ export interface CompanyInput {
   name: string;
   website?: string;
   industry?: string;
+  location?: string;
 }
 
 export interface InboxSyncSummary {

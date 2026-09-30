@@ -24,6 +24,7 @@ def _detail(company: Company) -> CompanyDetailDTO:
         name=company.name,
         website=company.website,
         industry=company.industry,
+        location=company.location,
         created_at=company.created_at,
         updated_at=company.updated_at,
     )
@@ -44,6 +45,7 @@ def list_companies(
                 name=company.name,
                 website=company.website,
                 industry=company.industry,
+                location=company.location,
                 contact_count=count,
                 created_at=company.created_at,
             )
@@ -56,7 +58,11 @@ def list_companies(
 @router.post("/companies")
 def create_company(payload: CompanyCreateRequest, db: DbSession) -> Response:
     company = service.create(
-        db, payload.name, website=payload.website, industry=payload.industry
+        db,
+        payload.name,
+        website=payload.website,
+        industry=payload.industry,
+        location=payload.location,
     )
     return data_body(_detail(company), status_code=201)
 
@@ -76,5 +82,6 @@ def patch_company(
         name=payload.name,
         website=payload.website,
         industry=payload.industry,
+        location=payload.location,
     )
     return data_body(_detail(company))

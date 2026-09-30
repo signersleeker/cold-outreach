@@ -13,6 +13,7 @@ export function NewCompanyDialog() {
   const [name, setName] = useState('');
   const [website, setWebsite] = useState('');
   const [industry, setIndustry] = useState('');
+  const [location, setLocation] = useState('');
   const create = useCreateCompany();
   const navigate = useNavigate();
 
@@ -22,6 +23,7 @@ export function NewCompanyDialog() {
       setName('');
       setWebsite('');
       setIndustry('');
+      setLocation('');
       create.reset();
     }
   }
@@ -43,7 +45,7 @@ export function NewCompanyDialog() {
             onSubmit={(event) => {
               event.preventDefault();
               create.mutate(
-                { name: name.trim(), website: website.trim(), industry },
+                { name: name.trim(), website: website.trim(), industry, location: location.trim() },
                 {
                   onSuccess: (company) => {
                     setOpen(false);
@@ -70,6 +72,14 @@ export function NewCompanyDialog() {
                   placeholder="https://northwind.example"
                   value={website}
                   onChange={(event) => setWebsite(event.target.value)}
+                />
+              </Field>
+              <Field label="Location">
+                <Input
+                  maxLength={200}
+                  placeholder="Sydney, Australia"
+                  value={location}
+                  onChange={(event) => setLocation(event.target.value)}
                 />
               </Field>
               <Field label="Industry">

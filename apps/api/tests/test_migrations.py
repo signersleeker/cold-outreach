@@ -19,7 +19,7 @@ def test_upgrade_is_idempotent(engine: Engine) -> None:
 def test_status_lists_every_migration(engine: Engine) -> None:
     rows = status(engine)
     versions = [v for v, _, _ in rows]
-    assert versions == ["0001", "0002", "0003", "0004", "0005"]
+    assert versions == ["0001", "0002", "0003", "0004", "0005", "0006"]
     assert all(applied for _, _, applied in rows)
 
 
@@ -27,8 +27,8 @@ def test_downgrade_past_companies_removes_the_table(engine: Engine) -> None:
     upgrade(engine)
     assert "companies" in inspect(engine).get_table_names()
 
-    rolled = downgrade(engine, steps=3)
-    assert rolled == ["0005", "0004", "0003"]
+    rolled = downgrade(engine, steps=4)
+    assert rolled == ["0006", "0005", "0004", "0003"]
     assert "companies" not in inspect(engine).get_table_names()
     assert "company" in {c["name"] for c in inspect(engine).get_columns("contacts")}
 
@@ -67,7 +67,7 @@ def test_initial_up_skips_existing_tables(engine: Engine) -> None:
 def test_companies_migration_backfills_existing_names(engine: Engine) -> None:
     """Downgrade past companies, seed a string company, upgrade and check the FK."""
     upgrade(engine)
-    downgrade(engine, steps=3)
+    downgrade(engine, steps=4)
     assert "company" in {c["name"] for c in inspect(engine).get_columns("contacts")}
 
     with engine.begin() as conn:
@@ -116,18 +116,19 @@ def test_full_downgrade_and_upgrade_round_trip(engine: Engine) -> None:
     assert "contacts" not in inspector.get_table_names()
 
     applied = upgrade(engine)
-    assert applied == ["0001", "0002", "0003", "0004", "0005"]
+    assert applied == ["0001", "0002", "0003", "0004", "0005", "0006"]
     assert "email_validations" in inspect(engine).get_table_names()
     assert "settings" in inspect(engine).get_table_names()
     assert "companies" in inspect(engine).get_table_names()
     assert "include_unsub_link" in {c["name"] for c in inspect(engine).get_columns("settings")}
     assert "website" in {c["name"] for c in inspect(engine).get_columns("companies")}
+    assert "location" in {c["name"] for c in inspect(engine).get_columns("companies")}
     assert "template_groups" in inspect(engine).get_table_names()
 
 
 def test_email_validation_migration_backfills_checked_contacts(engine: Engine) -> None:
     upgrade(engine)
-    downgrade(engine, steps=1)
+    downgrade(engine, steps=2)
     assert "email_validations" not in inspect(engine).get_table_names()
 
     with engine.begin() as conn:
