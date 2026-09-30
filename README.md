@@ -153,12 +153,16 @@ override any suggestion before importing:
 | `location`   | company_location, Company Location, location, city                     |
 | `title`      | title, Job Title, Position, Role                                       |
 | `hook`       | hook, angle                                                            |
-| `notes`      | notes, note, comments                                                  |
-| `source`     | source, Source URL, Lead Source, url                                   |
+| `notes`         | notes, note, comments — free text stored on the contact             |
+| `contact_notes` | contact notes, contact note — a note on the contact                 |
+| `company_notes` | company notes, company note — a note on the company                 |
+| `source`        | source, Source URL, Lead Source, url                                 |
 | *(name)*     | name, Full Name, Contact Name — split into first/last if no first/last |
 
 Matching company names (case-insensitive) share one company row. Open **Companies** in the nav to
-browse them and send to a company's contacts.
+browse them and send to a company's contacts. A company or contact page can hold its own notes.
+`company notes` and `contact notes` in a CSV create those notes; the `notes` column stays free
+text on the contact.
 
 Try it with the sample file, which deliberately exercises every outcome:
 

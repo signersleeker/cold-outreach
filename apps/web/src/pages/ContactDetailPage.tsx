@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
+import { NotesCard } from '@/components/NotesCard';
 import { SendModal, ValidationBadge } from '@/components/SendModal';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -177,7 +178,7 @@ export function ContactDetailPage() {
                   onChange={(event) => setDraft((c) => ({ ...c, source: event.target.value }))}
                 />
               </Field>
-              <Field label="Notes">
+              <Field label="Notes" hint="Free text stored on this contact.">
                 <Textarea
                   rows={3}
                   value={value('notes') as string}
@@ -187,6 +188,8 @@ export function ContactDetailPage() {
               <ErrorBanner error={update.error} />
             </CardBody>
           </Card>
+
+          <NotesCard notableType="contact" notableId={contact.id} />
 
           <Card>
             <CardHeader>

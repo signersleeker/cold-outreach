@@ -1,4 +1,4 @@
-import type { ContactFilter } from './api';
+import type { ContactFilter, NoteTarget } from './api';
 
 export interface ContactsQuery {
   q?: string;
@@ -25,6 +25,8 @@ export const queryKeys = {
   contact: (id: string) => ['contacts', id] as const,
   companies: (params: CompaniesQuery) => ['companies', params] as const,
   company: (id: string) => ['companies', id] as const,
+  notes: (notableType: NoteTarget, notableId: string) =>
+    ['notes', notableType, notableId] as const,
   templates: ['templates'] as const,
   templateGroups: ['template-groups'] as const,
   sendPreview: (contactId: string, templateId: string, acknowledge: string[]) =>

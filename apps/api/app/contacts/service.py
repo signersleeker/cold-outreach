@@ -28,6 +28,8 @@ from app.contacts.contact import Contact
 from app.contacts.csv_import import ParsedRow, parse_csv
 from app.lib.clock import Clock
 from app.lib.errors import AppError
+from app.notes import service as notes_service
+from app.notes.constants import NOTABLE_COMPANY, NOTABLE_CONTACT
 from app.sends.models.send_event import SendEvent
 from app.suppressions import service as suppressions_service
 from app.suppressions.constants import REASON_MANUAL
@@ -270,6 +272,7 @@ def delete(db: Session, contact_id: uuid.UUID, *, force: bool = False) -> dict[s
 
     email = contact.email
     still_suppressed = suppressions_service.is_suppressed(db, email) is not None
+    notes_service.delete_for(db, NOTABLE_CONTACT, contact.id)
     db.delete(contact)
     db.commit()
     return {
@@ -397,6 +400,29 @@ def create(
     return require(db, contact.id)
 
 
+def _attach_imported_notes(db: Session, contacts: list[Contact], rows: list[ParsedRow]) -> None:
+    """Turn contact_notes and company_notes cells into note rows.
+
+    The same company-note text on several rows of one company is stored once.
+    A company note on a row with no company is skipped.
+    """
+    for contact, row in zip(contacts, rows, strict=True):
+        notes_service.add(
+            db,
+            notable_type=NOTABLE_CONTACT,
+            notable_id=contact.id,
+            body=row.contact_notes,
+        )
+        if contact.company_id is not None:
+            notes_service.add(
+                db,
+                notable_type=NOTABLE_COMPANY,
+                notable_id=contact.company_id,
+                body=row.company_notes,
+                skip_duplicate=True,
+            )
+
+
 def import_csv(
     db: Session,
     content: bytes,
@@ -495,6 +521,7 @@ def import_csv(
         created.append(contact)
     db.flush()
     summary.created = len(created)
+    _attach_imported_notes(db, created, fresh)
 
     stored = validations_by_email(db, [contact.email for contact in created])
     validator_name = getattr(validator, "name", "unknown")

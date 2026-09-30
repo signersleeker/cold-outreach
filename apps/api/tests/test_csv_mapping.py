@@ -133,6 +133,21 @@ def test_website_and_industry_columns_are_mapped() -> None:
     }
 
 
+def test_company_and_contact_note_headers_map_separately() -> None:
+    result = parse(
+        "Email,Company,Contact Notes,Company Notes\n"
+        "a@example.com,Northwind,Met at AusCERT,Uses a shared vendor\n"
+    )
+    row = result.rows[0]
+    assert row.contact_notes == "Met at AusCERT"
+    assert row.company_notes == "Uses a shared vendor"
+    assert build_column_map(["Email", "Contact Note", "Company Note"]) == {
+        "email": 0,
+        "contact_notes": 1,
+        "company_notes": 2,
+    }
+
+
 def test_company_location_header_maps_to_location() -> None:
     result = parse(
         "Email,Company,company_location\n"

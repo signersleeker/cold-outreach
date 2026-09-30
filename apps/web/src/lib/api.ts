@@ -301,6 +301,17 @@ export interface CompanyInput {
   location?: string;
 }
 
+export type NoteTarget = 'contact' | 'company';
+
+export interface Note {
+  id: string;
+  notableType: NoteTarget;
+  notableId: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface InboxSyncSummary {
   scanned: number;
   stopsFound: number;
@@ -409,6 +420,15 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(changes),
     }),
+
+  notes: (notableType: NoteTarget, notableId: string) => {
+    const query = new URLSearchParams({ notableType, notableId });
+    return unwrapList<Note[], { total: number }>(`/api/v1/notes?${query}`);
+  },
+  createNote: (input: { notableType: NoteTarget; notableId: string; body: string }) =>
+    unwrap<Note>('/api/v1/notes', { method: 'POST', body: JSON.stringify(input) }),
+  deleteNote: (id: string) =>
+    unwrap<{ deleted: boolean }>(`/api/v1/notes/${id}`, { method: 'DELETE' }),
 
   // templates
   templates: () => unwrapList<Template[], unknown>('/api/v1/templates'),

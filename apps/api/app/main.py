@@ -24,6 +24,7 @@ from app.inbox.router import router as inbox_router
 from app.lib.clock import SystemClock
 from app.lib.errors import AppError
 from app.lib.response import error_body
+from app.notes.router import router as notes_router
 from app.sends.router import router as sends_router
 from app.sends.services.send import SendService
 from app.suppressions.router import router as suppressions_router
@@ -47,6 +48,7 @@ _API_ROUTERS = (
     settings_router,
     gmail_api_router,
     inbox_router,
+    notes_router,
 )
 
 

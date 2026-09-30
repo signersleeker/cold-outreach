@@ -22,7 +22,9 @@ _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 TEXT_FIELDS = ("first_name", "last_name", "company", "title", "hook", "notes", "source")
 # Stored on the company row, not the contact.
 COMPANY_FIELDS = ("website", "industry", "location")
-IMPORTABLE_FIELDS = frozenset({"email", "full_name", *TEXT_FIELDS, *COMPANY_FIELDS})
+# Become rows in the polymorphic notes table.
+NOTE_FIELDS = ("contact_notes", "company_notes")
+IMPORTABLE_FIELDS = frozenset({"email", "full_name", *TEXT_FIELDS, *COMPANY_FIELDS, *NOTE_FIELDS})
 
 
 def normalize_header(header: str) -> str:
@@ -87,6 +89,8 @@ class ParsedRow:
     website: str = ""
     industry: str = ""
     location: str = ""
+    contact_notes: str = ""
+    company_notes: str = ""
 
 
 @dataclass
@@ -213,7 +217,7 @@ def parse_csv(
             break
 
         parsed = ParsedRow(line_number=line_number, email=email)
-        for name in (*TEXT_FIELDS, *COMPANY_FIELDS):
+        for name in (*TEXT_FIELDS, *COMPANY_FIELDS, *NOTE_FIELDS):
             setattr(parsed, name, _cell(row, field_to_index.get(name)))
 
         if not parsed.first_name and not parsed.last_name and "full_name" in field_to_index:

@@ -12,6 +12,7 @@ from app.migrations.versions import (
     m0004_company_profile_and_groups,
     m0005_email_validations,
     m0006_company_location,
+    m0007_notes,
 )
 
 MODULES = (
@@ -21,4 +22,5 @@ MODULES = (
     m0004_company_profile_and_groups,
     m0005_email_validations,
     m0006_company_location,
+    m0007_notes,
 )

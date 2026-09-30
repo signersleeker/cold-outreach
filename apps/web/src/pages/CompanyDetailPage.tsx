@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
 import { IndustrySelect } from '@/components/IndustrySelect';
+import { NotesCard } from '@/components/NotesCard';
 import { NewContactDialog } from '@/components/NewContactDialog';
 import { SendModal, ValidationBadge } from '@/components/SendModal';
 import { Button } from '@/components/ui/button';
@@ -212,6 +213,8 @@ export function CompanyDetailPage() {
           </CardBody>
         </Card>
       ) : null}
+
+      {company ? <NotesCard notableType="company" notableId={company.id} /> : null}
 
       <Card className="overflow-hidden">
         {companyQuery.isLoading || contactsQuery.isLoading ? (

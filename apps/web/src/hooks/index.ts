@@ -7,6 +7,7 @@ import {
   type CompanyInput,
   type Contact,
   type NewContact,
+  type NoteTarget,
   api,
 } from '@/lib/api';
 import { type ContactsQuery, queryKeys } from '@/lib/query-keys';
@@ -199,6 +200,34 @@ export function useUpdateCompany() {
       client.invalidateQueries({ queryKey: ['companies'] });
       client.invalidateQueries({ queryKey: ['contacts'] });
     },
+  });
+}
+
+// ------------------------------------------------------------------ notes ----
+export const useNotes = (notableType: NoteTarget, notableId: string) =>
+  useQuery({
+    queryKey: queryKeys.notes(notableType, notableId),
+    queryFn: () => api.notes(notableType, notableId),
+    enabled: !!notableId,
+  });
+
+export function useCreateNote() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: api.createNote,
+    onSuccess: (note) => {
+      client.invalidateQueries({
+        queryKey: queryKeys.notes(note.notableType, note.notableId),
+      });
+    },
+  });
+}
+
+export function useDeleteNote() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteNote,
+    onSuccess: () => client.invalidateQueries({ queryKey: ['notes'] }),
   });
 }
 

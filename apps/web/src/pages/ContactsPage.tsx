@@ -53,6 +53,8 @@ const IMPORT_FIELDS: { value: string; label: string }[] = [
   { value: 'title', label: 'Title' },
   { value: 'hook', label: 'Hook' },
   { value: 'notes', label: 'Notes' },
+  { value: 'contact_notes', label: 'Contact notes' },
+  { value: 'company_notes', label: 'Company notes' },
   { value: 'source', label: 'Source' },
 ];
 
@@ -129,7 +131,8 @@ function ImportDialog() {
               : 'Addresses we have not checked before are validated on import. A previous result is reused, and invalid ones are suppressed automatically.'}{' '}
             Record where each address came from in the <strong>source</strong> column — that is
             your evidence for why contacting this person is defensible. Website, industry, and
-            location are stored on the company; the first non-blank value is kept.
+            location are stored on the company; the first non-blank value is kept. Contact
+            notes and company notes are saved as notes on that contact or company.
           </p>
           <label className="flex cursor-pointer items-start gap-2.5 text-xs">
             <Checkbox
