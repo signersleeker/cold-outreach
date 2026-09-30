@@ -113,3 +113,7 @@ class Contact(Base):
     @property
     def company_industry(self) -> str:
         return self.company_ref.industry if self.company_ref is not None else ""
+
+    @property
+    def company_website(self) -> str:
+        return self.company_ref.website if self.company_ref is not None else ""

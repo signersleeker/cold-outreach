@@ -152,6 +152,7 @@ def test_import_sets_website_industry_and_location(db: Session, validator, clock
     contact = contacts_service.by_email(db, "a@northwind.example")
     assert contact is not None
     assert contact.company_industry == "Insurance"
+    assert contact.company_website == "https://northwind.example"
 
 
 def test_update_company_name_reassigns(db: Session, make_contact) -> None:

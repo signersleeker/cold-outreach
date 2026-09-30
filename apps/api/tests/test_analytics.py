@@ -157,13 +157,16 @@ def test_industry_filter_route(client, db: Session, make_contact) -> None:
     make_contact(email="b@other.example", company="Other Co")
 
     assert contact.company_id is not None
-    companies_service.update(db, contact.company_id, industry="Insurance")
+    companies_service.update(
+        db, contact.company_id, industry="Insurance", website="https://northwind.example"
+    )
 
     response = client.get("/api/v1/contacts", params={"industry": "insurance"})
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["meta"]["total"] == 1
     assert body["data"][0]["companyIndustry"] == "Insurance"
+    assert body["data"][0]["companyWebsite"] == "https://northwind.example"
 
     stats = client.get("/api/v1/contacts/stats", params={"industry": "Insurance"})
     assert stats.status_code == 200, stats.text

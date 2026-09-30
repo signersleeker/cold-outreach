@@ -72,6 +72,7 @@ export interface Contact {
   company: string;
   companyId: string | null;
   companyIndustry: string;
+  companyWebsite: string;
   title: string;
   source: string;
   notes: string;

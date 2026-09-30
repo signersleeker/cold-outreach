@@ -29,7 +29,7 @@ import {
   useTemplateGroups,
 } from '@/hooks';
 import type { Contact, ContactFilter } from '@/lib/api';
-import { formatRelative, fullName, plural } from '@/lib/format';
+import { formatRelative, fullName, plural, websiteHref } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 const FILTERS: { value: ContactFilter; label: string }[] = [
@@ -620,7 +620,7 @@ export function ContactsPage() {
                     <Th>Name</Th>
                     <Th>Company</Th>
                     <Th>Industry</Th>
-                    <Th>Group</Th>
+                    <Th>Email Sequence</Th>
                     <Th>Title</Th>
                     <Th>Status</Th>
                     <Th>Last sent</Th>
@@ -643,14 +643,29 @@ export function ContactsPage() {
                         </Link>
                       </Td>
                       <Td className="whitespace-nowrap">{fullName(contact) || '—'}</Td>
-                      <Td>
+                      <Td className="whitespace-nowrap">
                         {contact.companyId ? (
-                          <Link
-                            to={`/companies/${contact.companyId}`}
-                            className="hover:underline"
-                          >
-                            {contact.company}
-                          </Link>
+                          <>
+                            <Link
+                              to={`/companies/${contact.companyId}`}
+                              className="hover:underline"
+                            >
+                              {contact.company}
+                            </Link>
+                            {contact.companyWebsite ? (
+                              <>
+                                <span className="text-muted-foreground"> - </span>
+                                <a
+                                  href={websiteHref(contact.companyWebsite)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs text-primary hover:underline"
+                                >
+                                  website
+                                </a>
+                              </>
+                            ) : null}
+                          </>
                         ) : (
                           '—'
                         )}

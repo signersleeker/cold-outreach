@@ -31,6 +31,7 @@ class ContactDTO(CamelModel):
     company: str
     company_id: uuid.UUID | None = None
     company_industry: str = ""
+    company_website: str = ""
     title: str
     source: str
     notes: str
