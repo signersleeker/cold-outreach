@@ -58,6 +58,23 @@ const IMPORT_FIELDS: { value: string; label: string }[] = [
   { value: 'source', label: 'Source' },
 ];
 
+const CSV_HEADERS = [
+  'email',
+  'first name',
+  'last name',
+  'full name',
+  'company name',
+  'company website',
+  'industry',
+  'company location',
+  'title',
+  'hook',
+  'notes',
+  'contact notes',
+  'company notes',
+  'source',
+];
+
 function ImportDialog() {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -128,12 +145,9 @@ function ImportDialog() {
           <p className="text-xs text-muted-foreground">
             {skipValidation
               ? 'Addresses we have not checked before are imported unvalidated. A previous result is reused.'
-              : 'Addresses we have not checked before are validated on import. A previous result is reused, and invalid ones are suppressed automatically.'}{' '}
-            Record where each address came from in the <strong>source</strong> column — that is
-            your evidence for why contacting this person is defensible. Website, industry, and
-            location are stored on the company; the first non-blank value is kept. Contact
-            notes and company notes are saved as notes on that contact or company.
+              : 'Addresses we have not checked before are validated on import. A previous result is reused, and invalid ones are suppressed automatically.'}
           </p>
+          <p className="font-mono text-xs text-muted-foreground">{CSV_HEADERS.join(', ')}</p>
           <label className="flex cursor-pointer items-start gap-2.5 text-xs">
             <Checkbox
               checked={skipValidation}
