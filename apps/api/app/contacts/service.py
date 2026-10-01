@@ -31,6 +31,12 @@ from app.lib.clock import Clock
 from app.lib.errors import AppError
 from app.notes import service as notes_service
 from app.notes.constants import NOTABLE_COMPANY, NOTABLE_CONTACT
+from app.sends.constants import (
+    SEND_STATUS_BOUNCED,
+    SEND_STATUS_QUEUED,
+    SEND_STATUS_REPLIED_STOP,
+    SEND_STATUS_SENT,
+)
 from app.sends.models.send_event import SendEvent
 from app.sequences.constants import ENROLLMENT_ACTIVE
 from app.sequences.enrollment import FollowUpEnrollment
@@ -338,9 +344,21 @@ def search(
     return rows, total
 
 
+# Mail that left (or may still leave) this app. A permanent Gmail rejection is
+# `failed` and rolls last_sent_at back, so a typo can still be corrected.
+_EMAIL_LOCKED_STATUSES = (
+    SEND_STATUS_QUEUED,
+    SEND_STATUS_SENT,
+    SEND_STATUS_BOUNCED,
+    SEND_STATUS_REPLIED_STOP,
+)
+
+
 # ------------------------------------------------------------------ mutation ----
 def update(db: Session, contact_id: uuid.UUID, changes: dict[str, str]) -> Contact:
     contact = require(db, contact_id)
+    if "email" in changes and changes["email"] is not None:
+        _apply_email_change(db, contact, changes["email"])
     editable = ("first_name", "last_name", "title", "hook", "notes", "source")
     for name in editable:
         if name in changes and changes[name] is not None:
@@ -351,6 +369,75 @@ def update(db: Session, contact_id: uuid.UUID, changes: dict[str, str]) -> Conta
     db.commit()
     db.refresh(contact)
     return require(db, contact.id)
+
+
+def email_has_been_sent(db: Session, contact: Contact) -> bool:
+    """True when mail has gone out, may have gone out, or is queued.
+
+    `last_sent_at` covers an ambiguous Gmail failure: the status is `failed`
+    but the message might be sitting in Sent, so the address stays put.
+    """
+    if contact.last_sent_at is not None:
+        return True
+    count = db.scalar(
+        select(func.count())
+        .select_from(SendEvent)
+        .where(
+            SendEvent.contact_id == contact.id,
+            SendEvent.status.in_(_EMAIL_LOCKED_STATUSES),
+        )
+    )
+    return bool(count)
+
+
+def _apply_email_change(db: Session, contact: Contact, raw: str) -> None:
+    """Replace the address when nothing has been sent to it.
+
+    The old suppression row and any stored validation stay keyed on the
+    previous address. The contact cache is then read from the new address, so
+    an opt-out does not follow a corrected typo and a known-bad address does
+    not arrive looking valid.
+    """
+    from app.contacts.normalize import is_valid_syntax, normalize_email
+
+    normalized = normalize_email(raw)
+    if not is_valid_syntax(normalized):
+        raise AppError(400, "Enter a valid email address.")
+    if normalized == contact.email:
+        return
+    if email_has_been_sent(db, contact):
+        raise AppError(
+            409,
+            "An email has already been sent to this contact, so the address can't be changed.",
+        )
+    if by_email(db, normalized) is not None:
+        raise AppError(409, f"{normalized} is already in the list")
+
+    contact.email = normalized
+    # autoflush is off. suppress() looks the contact up by email, so the new
+    # address has to be visible before a stored invalid verdict is applied.
+    db.flush()
+    stored = validation_for_email(db, normalized)
+    if stored is not None:
+        apply_stored(db, contact, stored)
+    else:
+        contact.validation_status = VALIDATION_PENDING
+        contact.validation_detail = ""
+        contact.validated_at = None
+    _sync_suppression_cache(db, contact)
+
+
+def _sync_suppression_cache(db: Session, contact: Contact) -> None:
+    """Point the denormalised suppression flags at the contact's current email."""
+    row = suppressions_service.is_suppressed(db, contact.email)
+    if row is None:
+        contact.suppressed = False
+        contact.suppressed_reason = ""
+        contact.suppressed_at = None
+        return
+    contact.suppressed = True
+    contact.suppressed_reason = row.reason
+    contact.suppressed_at = row.created_at
 
 
 def send_event_count(db: Session, contact_id: uuid.UUID) -> int:

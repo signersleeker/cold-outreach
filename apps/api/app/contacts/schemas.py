@@ -60,6 +60,7 @@ class ContactCreateRequest(CamelModel):
 
 
 class ContactPatchRequest(CamelModel):
+    email: str | None = Field(default=None, min_length=3, max_length=320)
     first_name: str | None = None
     last_name: str | None = None
     company: str | None = None

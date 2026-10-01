@@ -68,7 +68,7 @@ def create_send(payload: SendRequest, db: DbSession, sends: SendServiceDep) -> R
 def list_sends(
     db: DbSession,
     sends: SendServiceDep,
-    contact_id: uuid.UUID | None = Query(default=None),
+    contact_id: uuid.UUID | None = Query(default=None, alias="contactId"),
     limit: int = Query(default=100, ge=1, le=500),
 ) -> Response:
     events = sends.history(db, contact_id=contact_id, limit=limit)

@@ -80,6 +80,13 @@ export function ContactDetailPage() {
   const value = (key: EditableField) => draft[key] ?? contact[key];
   const dirty = Object.keys(draft).length > 0;
   const events = history?.data ?? [];
+  const historyLoaded = history !== undefined;
+  const mailRecorded =
+    contact.lastSentAt != null || events.some((event) => event.status !== 'failed');
+  // Wait for send history before unlocking. An empty list while the query is
+  // in flight would otherwise flash an editable field on a contact who has
+  // already been emailed.
+  const emailEditable = historyLoaded && !mailRecorded;
 
   return (
     <>
@@ -136,6 +143,28 @@ export function ContactDetailPage() {
             </CardHeader>
             <CardBody className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  className="sm:col-span-2"
+                  label="Email"
+                  hint={
+                    emailEditable
+                      ? 'You can correct this until the first email is sent.'
+                      : mailRecorded
+                        ? 'An email has already been sent to this address.'
+                        : undefined
+                  }
+                >
+                  <Input
+                    type="email"
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={!emailEditable}
+                    value={emailEditable ? (draft.email ?? contact.email) : contact.email}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, email: event.target.value }))
+                    }
+                  />
+                </Field>
                 {TEXT_FIELDS.map((field) => (
                   <Field key={field.key} label={field.label}>
                     <Input
