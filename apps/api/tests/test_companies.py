@@ -110,19 +110,35 @@ def test_create_and_update_website_and_industry(db: Session) -> None:
         db,
         "Northwind",
         website=" https://northwind.example ",
+        linkedin_url=" https://www.linkedin.com/company/northwind ",
         industry="insurance",
+        size="11-25",
         location="  Sydney  ",
     )
     assert company.website == "https://northwind.example"
+    assert company.linkedin_url == "https://www.linkedin.com/company/northwind"
     assert company.industry == "Insurance"
+    assert company.size == "11-25"
     assert company.location == "Sydney"
 
     updated = companies_service.update(
-        db, company.id, industry="Mining & Metals", website="", location="Melbourne"
+        db,
+        company.id,
+        industry="Mining & Metals",
+        website="",
+        linkedin_url="",
+        size="5000+",
+        location="Melbourne",
     )
     assert updated.industry == "Mining & Metals"
     assert updated.website == ""
+    assert updated.linkedin_url == ""
+    assert updated.size == "5000+"
     assert updated.location == "Melbourne"
+
+    with pytest.raises(AppError) as bad_size:
+        companies_service.create(db, "Acme Size", size="huge")
+    assert bad_size.value.status_code == 400
 
     with pytest.raises(AppError) as unknown:
         companies_service.create(db, "Acme", industry="Space Mining")
@@ -131,10 +147,10 @@ def test_create_and_update_website_and_industry(db: Session) -> None:
 
 def test_import_sets_website_industry_and_location(db: Session, validator, clock) -> None:
     csv = (
-        "Email,Company,Website,Industry,company_location\n"
-        "a@northwind.example,Northwind,,,\n"
-        "b@northwind.example,Northwind, https://northwind.example ,insurance, Sydney \n"
-        "c@acme.example,Acme,acme.example,Not A Real Industry,\n"
+        "Email,Company,Website,Industry,company_location,company_linkedin_url,company_size\n"
+        "a@northwind.example,Northwind,,,,,\n"
+        "b@northwind.example,Northwind, https://northwind.example ,insurance, Sydney , https://www.linkedin.com/company/northwind , 51 - 100 employees \n"
+        "c@acme.example,Acme,acme.example,Not A Real Industry,,,not a size\n"
     )
     summary = contacts_service.import_csv(db, csv.encode(), validator=validator, clock=clock)
     assert summary.created == 3
@@ -143,10 +159,14 @@ def test_import_sets_website_industry_and_location(db: Session, validator, clock
     acme = companies_service.find_by_name(db, "Acme")
     assert northwind is not None and acme is not None
     assert northwind.website == "https://northwind.example"
+    assert northwind.linkedin_url == "https://www.linkedin.com/company/northwind"
     assert northwind.industry == "Insurance"
     assert northwind.location == "Sydney"
+    assert northwind.size == "51-100"
     assert acme.website == "acme.example"
+    assert acme.linkedin_url == ""
     assert acme.industry == ""
+    assert acme.size == ""
     assert acme.location == ""
 
     contact = contacts_service.by_email(db, "a@northwind.example")

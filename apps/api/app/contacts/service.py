@@ -623,7 +623,6 @@ def import_csv(
             last_name=row.last_name,
             title=row.title,
             hook=row.hook,
-            notes=row.notes,
             source=row.source,
         )
         _assign_company(db, contact, row.company)
@@ -631,7 +630,9 @@ def import_csv(
             companies_service.fill_blanks(
                 contact.company_ref,
                 website=row.website,
+                linkedin_url=row.linkedin_url,
                 industry=row.industry,
+                size=row.size,
                 location=row.location,
             )
         _assign_unsub_token(db, contact)

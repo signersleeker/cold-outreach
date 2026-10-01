@@ -421,7 +421,9 @@ export interface Company {
   id: string;
   name: string;
   website: string;
+  linkedinUrl: string;
   industry: string;
+  size: string;
   location: string;
   contactCount: number;
   createdAt: string;
@@ -431,7 +433,9 @@ export interface CompanyDetail {
   id: string;
   name: string;
   website: string;
+  linkedinUrl: string;
   industry: string;
+  size: string;
   location: string;
   createdAt: string;
   updatedAt: string;
@@ -440,7 +444,9 @@ export interface CompanyDetail {
 export interface CompanyInput {
   name: string;
   website?: string;
+  linkedinUrl?: string;
   industry?: string;
+  size?: string;
   location?: string;
 }
 

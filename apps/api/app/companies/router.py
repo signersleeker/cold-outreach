@@ -23,7 +23,9 @@ def _detail(company: Company) -> CompanyDetailDTO:
         id=company.id,
         name=company.name,
         website=company.website,
+        linkedin_url=company.linkedin_url,
         industry=company.industry,
+        size=company.size,
         location=company.location,
         created_at=company.created_at,
         updated_at=company.updated_at,
@@ -44,7 +46,9 @@ def list_companies(
                 id=company.id,
                 name=company.name,
                 website=company.website,
+                linkedin_url=company.linkedin_url,
                 industry=company.industry,
+                size=company.size,
                 location=company.location,
                 contact_count=count,
                 created_at=company.created_at,
@@ -61,7 +65,9 @@ def create_company(payload: CompanyCreateRequest, db: DbSession) -> Response:
         db,
         payload.name,
         website=payload.website,
+        linkedin_url=payload.linkedin_url,
         industry=payload.industry,
+        size=payload.size,
         location=payload.location,
     )
     return data_body(_detail(company), status_code=201)
@@ -81,7 +87,9 @@ def patch_company(
         company_id,
         name=payload.name,
         website=payload.website,
+        linkedin_url=payload.linkedin_url,
         industry=payload.industry,
+        size=payload.size,
         location=payload.location,
     )
     return data_body(_detail(company))

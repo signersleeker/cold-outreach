@@ -47,7 +47,6 @@ def test_build_column_map_resolves_aliases() -> None:
         "company": 3,
         "title": 4,
         "hook": 5,
-        "notes": 6,
         "source": 7,
     }
 
@@ -148,6 +147,30 @@ def test_company_and_contact_note_headers_map_separately() -> None:
     }
 
 
+def test_company_linkedin_url_header_maps_to_linkedin() -> None:
+    result = parse(
+        "Email,Company,company_linkedin_url\n"
+        "a@example.com,Northwind,https://www.linkedin.com/company/northwind\n"
+    )
+    assert result.rows[0].linkedin_url == "https://www.linkedin.com/company/northwind"
+    assert build_column_map(["Email", "Company LinkedIn"]) == {
+        "email": 0,
+        "linkedin_url": 1,
+    }
+
+
+def test_company_size_header_maps_to_size() -> None:
+    result = parse(
+        "Email,Company,company_size\n"
+        "a@example.com,Northwind,11-25\n"
+    )
+    assert result.rows[0].size == "11-25"
+    assert build_column_map(["Email", "Employees", "Headcount"]) == {
+        "email": 0,
+        "size": 1,
+    }
+
+
 def test_company_location_header_maps_to_location() -> None:
     result = parse(
         "Email,Company,company_location\n"
@@ -206,7 +229,6 @@ def test_full_row_is_mapped() -> None:
     )
     assert (row.company, row.title) == ("Northwind Mutual", "CISO")
     assert row.hook == "CPS 234 uplift"
-    assert row.notes == "Published address"
     assert row.source == "https://example.com/leadership"
     assert row.line_number == 2
 
@@ -221,8 +243,8 @@ def test_bom_and_crlf_are_tolerated() -> None:
 
 
 def test_quoted_commas_survive() -> None:
-    result = parse('Email,Notes\na@example.com,"Spoke at AusCERT, on the record"\n')
-    assert result.rows[0].notes == "Spoke at AusCERT, on the record"
+    result = parse('Email,Contact Notes\na@example.com,"Spoke at AusCERT, on the record"\n')
+    assert result.rows[0].contact_notes == "Spoke at AusCERT, on the record"
 
 
 def test_blank_lines_are_ignored() -> None:

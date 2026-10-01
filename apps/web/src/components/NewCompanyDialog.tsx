@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateCompany } from '@/hooks';
 import { ErrorBanner } from './AppLayout';
+import { CompanySizeSelect } from './CompanySizeSelect';
 import { IndustrySelect } from './IndustrySelect';
 import { Button } from './ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from './ui/dialog';
@@ -12,7 +13,9 @@ export function NewCompanyDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [website, setWebsite] = useState('');
+  const [linkedinUrl, setLinkedinUrl] = useState('');
   const [industry, setIndustry] = useState('');
+  const [size, setSize] = useState('');
   const [location, setLocation] = useState('');
   const create = useCreateCompany();
   const navigate = useNavigate();
@@ -22,7 +25,9 @@ export function NewCompanyDialog() {
     if (next) {
       setName('');
       setWebsite('');
+      setLinkedinUrl('');
       setIndustry('');
+      setSize('');
       setLocation('');
       create.reset();
     }
@@ -45,7 +50,14 @@ export function NewCompanyDialog() {
             onSubmit={(event) => {
               event.preventDefault();
               create.mutate(
-                { name: name.trim(), website: website.trim(), industry, location: location.trim() },
+                {
+                  name: name.trim(),
+                  website: website.trim(),
+                  linkedinUrl: linkedinUrl.trim(),
+                  industry,
+                  size,
+                  location: location.trim(),
+                },
                 {
                   onSuccess: (company) => {
                     setOpen(false);
@@ -74,6 +86,14 @@ export function NewCompanyDialog() {
                   onChange={(event) => setWebsite(event.target.value)}
                 />
               </Field>
+              <Field label="LinkedIn">
+                <Input
+                  maxLength={500}
+                  placeholder="https://www.linkedin.com/company/northwind"
+                  value={linkedinUrl}
+                  onChange={(event) => setLinkedinUrl(event.target.value)}
+                />
+              </Field>
               <Field label="Location">
                 <Input
                   maxLength={200}
@@ -84,6 +104,9 @@ export function NewCompanyDialog() {
               </Field>
               <Field label="Industry">
                 <IndustrySelect value={industry} onValueChange={setIndustry} />
+              </Field>
+              <Field label="Size">
+                <CompanySizeSelect value={size} onValueChange={setSize} />
               </Field>
             </div>
           </form>

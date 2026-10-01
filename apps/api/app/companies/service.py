@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.companies.company import Company
-from app.companies.constants import match_industry, require_industry
+from app.companies.constants import match_industry, match_size, require_industry, require_size
 from app.contacts.contact import Contact
 from app.lib.errors import AppError
 
@@ -38,19 +38,32 @@ def find_by_name(db: Session, name: str) -> Company | None:
 
 
 def fill_blanks(
-    company: Company, *, website: str = "", industry: str = "", location: str = ""
+    company: Company,
+    *,
+    website: str = "",
+    linkedin_url: str = "",
+    industry: str = "",
+    size: str = "",
+    location: str = "",
 ) -> None:
-    """Set website, industry, or location only where the company does not already have one.
+    """Set profile fields only where the company does not already have a value.
 
-    An unrecognised industry is ignored so a bad CSV cell does not fail the row.
+    An unrecognised industry or size is ignored so a bad CSV cell does not fail the row.
     """
     site = _website(website)
     if site and not company.website:
         company.website = site
+    linkedin = _website(linkedin_url)
+    if linkedin and not company.linkedin_url:
+        company.linkedin_url = linkedin
     if not company.industry:
         matched = match_industry(industry)
         if matched:
             company.industry = matched
+    if not company.size:
+        matched_size = match_size(size)
+        if matched_size:
+            company.size = matched_size
     place = _location(location)
     if place and not company.location:
         company.location = place
@@ -79,7 +92,9 @@ def create(
     name: str,
     *,
     website: str = "",
+    linkedin_url: str = "",
     industry: str = "",
+    size: str = "",
     location: str = "",
 ) -> Company:
     """Create a company explicitly. Refuses a blank or duplicate name."""
@@ -92,7 +107,9 @@ def create(
     company = Company(
         name=stripped[:200],
         website=_website(website),
+        linkedin_url=_website(linkedin_url),
         industry=require_industry(industry),
+        size=require_size(size),
         location=_location(location),
     )
     db.add(company)
@@ -107,7 +124,9 @@ def update(
     *,
     name: str | None = None,
     website: str | None = None,
+    linkedin_url: str | None = None,
     industry: str | None = None,
+    size: str | None = None,
     location: str | None = None,
 ) -> Company:
     company = require(db, company_id)
@@ -121,8 +140,12 @@ def update(
         company.name = stripped[:200]
     if website is not None:
         company.website = _website(website)
+    if linkedin_url is not None:
+        company.linkedin_url = _website(linkedin_url)
     if industry is not None:
         company.industry = require_industry(industry)
+    if size is not None:
+        company.size = require_size(size)
     if location is not None:
         company.location = _location(location)
     db.add(company)

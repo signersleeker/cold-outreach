@@ -19,9 +19,9 @@ _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 
 # Fields a CSV may populate directly. full_name is handled separately: it is
 # split into first/last only when no dedicated columns are present.
-TEXT_FIELDS = ("first_name", "last_name", "company", "title", "hook", "notes", "source")
+TEXT_FIELDS = ("first_name", "last_name", "company", "title", "hook", "source")
 # Stored on the company row, not the contact.
-COMPANY_FIELDS = ("website", "industry", "location")
+COMPANY_FIELDS = ("website", "linkedin_url", "industry", "size", "location")
 # Become rows in the polymorphic notes table.
 NOTE_FIELDS = ("contact_notes", "company_notes")
 IMPORTABLE_FIELDS = frozenset({"email", "full_name", *TEXT_FIELDS, *COMPANY_FIELDS, *NOTE_FIELDS})
@@ -84,10 +84,11 @@ class ParsedRow:
     company: str = ""
     title: str = ""
     hook: str = ""
-    notes: str = ""
     source: str = ""
     website: str = ""
+    linkedin_url: str = ""
     industry: str = ""
+    size: str = ""
     location: str = ""
     contact_notes: str = ""
     company_notes: str = ""

@@ -54,7 +54,7 @@ export function CompaniesPage() {
 
       <Card className="overflow-hidden">
         {isLoading ? (
-          <TableSkeleton cols={6} />
+          <TableSkeleton cols={8} />
         ) : companies.length === 0 ? (
           <EmptyState
             icon={Building2}
@@ -69,8 +69,10 @@ export function CompaniesPage() {
                 <tr>
                   <Th>Name</Th>
                   <Th>Industry</Th>
+                  <Th>Size</Th>
                   <Th>Location</Th>
                   <Th>Website</Th>
+                  <Th>LinkedIn</Th>
                   <Th>Contacts</Th>
                   <Th>Created</Th>
                 </tr>
@@ -87,6 +89,7 @@ export function CompaniesPage() {
                       </Link>
                     </Td>
                     <Td>{company.industry || '—'}</Td>
+                    <Td>{company.size || '—'}</Td>
                     <Td>{company.location || '—'}</Td>
                     <Td className="max-w-48 truncate text-xs">
                       {company.website ? (
@@ -97,6 +100,20 @@ export function CompaniesPage() {
                           className="hover:underline"
                         >
                           {company.website}
+                        </a>
+                      ) : (
+                        '—'
+                      )}
+                    </Td>
+                    <Td className="max-w-48 truncate text-xs">
+                      {company.linkedinUrl ? (
+                        <a
+                          href={websiteHref(company.linkedinUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline"
+                        >
+                          {company.linkedinUrl}
                         </a>
                       ) : (
                         '—'

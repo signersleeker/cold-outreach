@@ -86,7 +86,7 @@ def test_import_writes_contact_and_company_notes(db: Session, validator, clock) 
     bao = contacts_service.by_email(db, "b@northwind.example")
     solo = contacts_service.by_email(db, "c@solo.example")
     assert avery is not None and bao is not None and solo is not None
-    assert avery.notes == "free text"
+    assert avery.notes == ""
     assert avery.company_id == bao.company_id
     assert solo.company_id is None
 

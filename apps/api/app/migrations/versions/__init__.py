@@ -15,6 +15,8 @@ from app.migrations.versions import (
     m0007_notes,
     m0008_follow_up_plans,
     m0009_settings_timezone,
+    m0010_company_linkedin,
+    m0011_company_size,
 )
 
 MODULES = (
@@ -27,4 +29,6 @@ MODULES = (
     m0007_notes,
     m0008_follow_up_plans,
     m0009_settings_timezone,
+    m0010_company_linkedin,
+    m0011_company_size,
 )

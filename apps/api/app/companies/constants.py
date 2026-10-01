@@ -31,6 +31,32 @@ INDUSTRIES: tuple[str, ...] = (
 
 _BY_LOWER = {name.lower(): name for name in INDUSTRIES}
 
+# Employee-count buckets. Blank means unset. Stored value is always canonical.
+COMPANY_SIZES: tuple[str, ...] = (
+    "1-10",
+    "11-25",
+    "26-50",
+    "51-100",
+    "101-200",
+    "201-500",
+    "501-1000",
+    "1001-5000",
+    "5000+",
+)
+
+
+def _fold_size(value: str) -> str:
+    """Compare key: drop spaces and a trailing 'employees', and flatten dashes."""
+    folded = value.strip().lower().replace("–", "-").replace("—", "-")
+    if folded.endswith(" employees"):
+        folded = folded[: -len(" employees")]
+    elif folded.endswith(" employee"):
+        folded = folded[: -len(" employee")]
+    return "".join(folded.split())
+
+
+_SIZE_BY_FOLDED = {_fold_size(size): size for size in COMPANY_SIZES}
+
 # Query value for "no industry": a contact with no company, or a company left blank.
 # Not a member of INDUSTRIES, so it cannot collide with a stored tag.
 UNSET_INDUSTRY = "none"
@@ -42,6 +68,21 @@ def match_industry(value: str) -> str | None:
     if not stripped:
         return ""
     return _BY_LOWER.get(stripped.lower())
+
+
+def match_size(value: str) -> str | None:
+    """Canonical company size, '' when blank, or None when the value is not a bucket."""
+    if not value.strip():
+        return ""
+    return _SIZE_BY_FOLDED.get(_fold_size(value))
+
+
+def require_size(value: str) -> str:
+    """Canonical company size, or '' when blank. Unknown values are an error."""
+    matched = match_size(value)
+    if matched is None:
+        raise AppError(400, f"unknown company size {value.strip()!r}")
+    return matched
 
 
 def require_industry(value: str) -> str:

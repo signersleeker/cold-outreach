@@ -21,7 +21,11 @@ class Company(Base):
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     website: Mapped[str] = mapped_column(String(500), nullable=False, server_default="", default="")
+    linkedin_url: Mapped[str] = mapped_column(
+        String(500), nullable=False, server_default="", default=""
+    )
     industry: Mapped[str] = mapped_column(String(80), nullable=False, server_default="", default="")
+    size: Mapped[str] = mapped_column(String(16), nullable=False, server_default="", default="")
     location: Mapped[str] = mapped_column(String(200), nullable=False, server_default="", default="")
 
     created_at: Mapped[dt.datetime] = mapped_column(

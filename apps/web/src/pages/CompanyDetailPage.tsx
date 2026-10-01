@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ErrorBanner, PageBody, PageHeader } from '@/components/AppLayout';
 import { DeleteContactDialog } from '@/components/DeleteContactDialog';
+import { CompanySizeSelect } from '@/components/CompanySizeSelect';
 import { IndustrySelect } from '@/components/IndustrySelect';
 import { NotesCard } from '@/components/NotesCard';
 import { NewContactDialog } from '@/components/NewContactDialog';
@@ -75,7 +76,14 @@ export function CompanyDetailPage() {
   const [offset, setOffset] = useState(0);
   const [sendTo, setSendTo] = useState<Contact | null>(null);
   const [suppressTarget, setSuppressTarget] = useState<Contact | null>(null);
-  const [profile, setProfile] = useState({ name: '', website: '', industry: '', location: '' });
+  const [profile, setProfile] = useState({
+    name: '',
+    website: '',
+    linkedinUrl: '',
+    industry: '',
+    size: '',
+    location: '',
+  });
   const updateCompany = useUpdateCompany();
 
   const companyQuery = useCompany(id);
@@ -93,7 +101,9 @@ export function CompanyDetailPage() {
     setProfile({
       name: company.name,
       website: company.website,
+      linkedinUrl: company.linkedinUrl,
       industry: company.industry,
+      size: company.size,
       location: company.location,
     });
   }, [company]);
@@ -118,7 +128,12 @@ export function CompanyDetailPage() {
         title={company?.name ?? 'Company'}
         description={
           company
-            ? [company.industry, company.location, `${total} contact${total === 1 ? '' : 's'}`]
+            ? [
+                company.industry,
+                company.size,
+                company.location,
+                `${total} contact${total === 1 ? '' : 's'}`,
+              ]
                 .filter(Boolean)
                 .join(' · ')
             : 'Loading company…'
@@ -147,7 +162,9 @@ export function CompanyDetailPage() {
                 !profile.name.trim() ||
                 (profile.name === company.name &&
                   profile.website === company.website &&
+                  profile.linkedinUrl === company.linkedinUrl &&
                   profile.industry === company.industry &&
+                  profile.size === company.size &&
                   profile.location === company.location)
               }
               onClick={() =>
@@ -155,7 +172,9 @@ export function CompanyDetailPage() {
                   id: company.id,
                   name: profile.name.trim(),
                   website: profile.website.trim(),
+                  linkedinUrl: profile.linkedinUrl.trim(),
                   industry: profile.industry,
+                  size: profile.size,
                   location: profile.location.trim(),
                 })
               }
@@ -175,6 +194,12 @@ export function CompanyDetailPage() {
               <IndustrySelect
                 value={profile.industry}
                 onValueChange={(industry) => setProfile((current) => ({ ...current, industry }))}
+              />
+            </Field>
+            <Field label="Size">
+              <CompanySizeSelect
+                value={profile.size}
+                onValueChange={(size) => setProfile((current) => ({ ...current, size }))}
               />
             </Field>
             <Field label="Location" className="sm:col-span-2">
@@ -204,6 +229,26 @@ export function CompanyDetailPage() {
                   className="text-xs text-muted-foreground hover:underline"
                 >
                   Open website
+                </a>
+              ) : null}
+            </Field>
+            <Field label="LinkedIn" className="sm:col-span-2">
+              <Input
+                maxLength={500}
+                placeholder="https://www.linkedin.com/company/example"
+                value={profile.linkedinUrl}
+                onChange={(event) =>
+                  setProfile((current) => ({ ...current, linkedinUrl: event.target.value }))
+                }
+              />
+              {profile.linkedinUrl.trim() ? (
+                <a
+                  href={websiteHref(profile.linkedinUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-muted-foreground hover:underline"
+                >
+                  Open LinkedIn
                 </a>
               ) : null}
             </Field>
